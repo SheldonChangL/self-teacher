@@ -74,9 +74,9 @@ export function TTSButton({ text }: { text: string }) {
   return (
     <button
       onClick={playing ? stop : start}
-      className="rounded-full bg-sky-500 px-4 py-2 text-sm font-medium text-white shadow hover:bg-sky-600"
+      className="w-full rounded-3xl bg-sky-500 py-5 text-2xl font-bold text-white shadow-lg transition hover:bg-sky-600 active:scale-95"
     >
-      {playing ? "⏹ 停止朗讀" : "🔊 朗讀給我聽"}
+      {playing ? "⏹ 停止" : "🔊 老師念給我聽"}
     </button>
   );
 }
