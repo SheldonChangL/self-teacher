@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Markdown } from "@/components/Markdown";
 import { LoadingMascot } from "@/components/LoadingMascot";
 import { TTSButton } from "@/components/TTSButton";
+import { BackLink } from "@/components/BackLink";
 
 type State = "loading" | "streaming" | "done" | "error";
 
@@ -107,12 +108,7 @@ export default function LessonPage({
   return (
     <main className="flex flex-1 flex-col items-center px-6 py-8">
       <div className="w-full max-w-2xl">
-        <Link
-          href={`/kid/${id}`}
-          className="text-sm text-amber-700 hover:underline"
-        >
-          ← 回首頁
-        </Link>
+        <BackLink href={`/kid/${id}`}>回首頁</BackLink>
 
         <div className="mt-4 rounded-3xl bg-white/90 p-6 shadow-lg ring-1 ring-amber-100">
           {text === "" && state !== "error" && (

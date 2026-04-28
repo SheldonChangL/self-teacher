@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { BackLink } from "@/components/BackLink";
 
 const AVATARS = [
   "🦊",
@@ -54,9 +54,7 @@ export default function NewProfilePage() {
   return (
     <main className="flex flex-1 flex-col items-center px-6 py-12">
       <div className="w-full max-w-xl rounded-3xl bg-white/90 p-8 shadow-lg ring-1 ring-amber-100">
-        <Link href="/" className="text-sm text-amber-700 hover:underline">
-          ← 回首頁
-        </Link>
+        <BackLink href="/">回首頁</BackLink>
         <h1 className="mt-2 text-3xl font-bold text-amber-700">
           新增小朋友 ✨
         </h1>

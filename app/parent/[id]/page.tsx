@@ -4,6 +4,7 @@ import { db, type Profile } from "@/lib/db";
 import { getKidStats, getKidSessions } from "@/lib/stats";
 import { SUBJECTS } from "@/lib/subjects";
 import { PieChart, ScoreLineChart, SUBJECT_COLORS } from "@/components/Charts";
+import { BackLink } from "@/components/BackLink";
 
 export const dynamic = "force-dynamic";
 
@@ -48,12 +49,7 @@ export default async function KidDetail({
   return (
     <main className="flex flex-1 flex-col items-center px-6 py-10">
       <div className="w-full max-w-5xl">
-        <Link
-          href="/parent"
-          className="text-sm text-amber-700 hover:underline"
-        >
-          ← 回家長後台
-        </Link>
+        <BackLink href="/parent">回家長後台</BackLink>
 
         <header className="mt-2 flex items-center gap-5">
           <span className="text-7xl">{profile.avatar}</span>

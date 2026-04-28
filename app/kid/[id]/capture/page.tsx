@@ -2,9 +2,9 @@
 
 import { useRef, useState, use } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
 import Webcam from "react-webcam";
 import { SUBJECTS, type Subject } from "@/lib/subjects";
+import { BackLink } from "@/components/BackLink";
 
 type Snap = { dataUrl: string; blob: Blob };
 
@@ -128,14 +128,7 @@ export default function CapturePage({
   return (
     <main className="flex flex-1 flex-col items-center px-6 py-8">
       <div className="w-full max-w-2xl">
-        {!fromPhone && (
-          <Link
-            href={`/kid/${id}`}
-            className="text-sm text-amber-700 hover:underline"
-          >
-            ← 回上頁
-          </Link>
-        )}
+        {!fromPhone && <BackLink href={`/kid/${id}`}>回上頁</BackLink>}
         <h1 className="mt-2 text-3xl font-bold text-amber-700">
           {fromPhone ? "📱 給電視老師拍張照" : "📷 拍下你想學的東西！"}
         </h1>

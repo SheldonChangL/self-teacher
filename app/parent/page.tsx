@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getParentStats } from "@/lib/stats";
+import { BackLink } from "@/components/BackLink";
 import { SUBJECTS } from "@/lib/subjects";
 import {
   ActivityBarChart,
@@ -30,9 +31,7 @@ export default function ParentDashboard() {
     <main className="flex flex-1 flex-col items-center px-6 py-10">
       <div className="w-full max-w-5xl">
         <div className="flex items-center justify-between">
-          <Link href="/" className="text-sm text-amber-700 hover:underline">
-            ← 回首頁
-          </Link>
+          <BackLink href="/">回首頁</BackLink>
           <span className="text-xs text-zinc-400">
             最後更新：{new Date().toLocaleString("zh-TW")}
           </span>

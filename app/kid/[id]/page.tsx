@@ -5,6 +5,7 @@ import QRCode from "qrcode";
 import { db, Profile, Session } from "@/lib/db";
 import { SUBJECTS } from "@/lib/subjects";
 import { PairingQR } from "@/components/PairingQR";
+import { BackLink } from "@/components/BackLink";
 
 const SUBJECT_BY_ID = Object.fromEntries(SUBJECTS.map((s) => [s.id, s]));
 
@@ -45,9 +46,7 @@ export default async function KidHome({
   return (
     <main className="flex flex-1 flex-col items-center px-6 py-10">
       <div className="w-full max-w-4xl">
-        <Link href="/" className="text-sm text-amber-700 hover:underline">
-          ← 換人
-        </Link>
+        <BackLink href="/">換人</BackLink>
 
         <header className="mt-2 flex items-center gap-4">
           <span className="text-7xl">{profile.avatar}</span>

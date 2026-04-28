@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { LoadingMascot } from "@/components/LoadingMascot";
+import { BackLink } from "@/components/BackLink";
 import type { Quiz } from "@/lib/quiz-runner";
 
 type Result = "correct" | "wrong" | null;
@@ -72,12 +73,7 @@ export default function QuizPage({
     return (
       <main className="flex flex-1 flex-col items-center px-6 py-8">
         <div className="w-full max-w-xl rounded-3xl bg-white/90 p-6 shadow-lg ring-1 ring-amber-100">
-          <Link
-            href={`/kid/${id}/lesson/${sid}`}
-            className="text-sm text-amber-700 hover:underline"
-          >
-            ← 回課文
-          </Link>
+          <BackLink href={`/kid/${id}/lesson/${sid}`}>回課文</BackLink>
           <LoadingMascot
             message={
               status === "running" || status === "pending"
@@ -129,12 +125,7 @@ export default function QuizPage({
   return (
     <main className="flex flex-1 flex-col items-center px-6 py-8">
       <div className="w-full max-w-xl">
-        <Link
-          href={`/kid/${id}/lesson/${sid}`}
-          className="text-sm text-amber-700 hover:underline"
-        >
-          ← 回課文
-        </Link>
+        <BackLink href={`/kid/${id}/lesson/${sid}`}>回課文</BackLink>
         <div className="mt-2 flex items-center justify-between">
           <h1 className="text-2xl font-bold text-amber-700">
             🧠 第 {idx + 1} / {quiz.questions.length} 題
