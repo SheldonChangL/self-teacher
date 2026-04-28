@@ -1,0 +1,126 @@
+import { db, Profile, Session } from "@/lib/db";
+import { streamClaude } from "@/lib/claude";
+import { buildLessonPrompt } from "@/lib/prompts";
+import { startQuizGeneration } from "@/lib/quiz-runner";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+function extractTitle(md: string): string {
+  const m = md.match(/^#\s+(.+)$/m);
+  return m ? m[1].trim() : "今天的學習";
+}
+
+export async function GET(
+  req: Request,
+  ctx: { params: Promise<{ sid: string }> },
+) {
+  const { sid } = await ctx.params;
+  const session = db
+    .prepare("SELECT * FROM sessions WHERE id = ?")
+    .get(sid) as Session | undefined;
+  if (!session) {
+    return new Response("session not found", { status: 404 });
+  }
+
+  // If already done, replay full content quickly so a refresh works.
+  if (session.lesson_status === "done" && session.lesson_json) {
+    const lesson = JSON.parse(session.lesson_json) as { markdown: string };
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          new TextEncoder().encode(
+            `data: ${JSON.stringify({ delta: lesson.markdown })}\n\n` +
+              `data: ${JSON.stringify({ done: true, cached: true })}\n\n`,
+          ),
+        );
+        controller.close();
+      },
+    });
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+      },
+    });
+  }
+
+  const profile = db
+    .prepare("SELECT * FROM profiles WHERE id = ?")
+    .get(session.profile_id) as Profile | undefined;
+  if (!profile) {
+    return new Response("profile not found", { status: 404 });
+  }
+
+  const imagePaths = JSON.parse(session.image_paths) as string[];
+  const prompt = buildLessonPrompt({
+    profile,
+    imageRelPaths: imagePaths,
+    subject: session.subject,
+    hint: session.hint,
+  });
+
+  db.prepare("UPDATE sessions SET lesson_status = 'running' WHERE id = ?").run(
+    sid,
+  );
+
+  const enc = new TextEncoder();
+  const ac = new AbortController();
+  req.signal.addEventListener("abort", () => ac.abort());
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      let full = "";
+      const send = (obj: unknown) =>
+        controller.enqueue(enc.encode(`data: ${JSON.stringify(obj)}\n\n`));
+      // initial heartbeat so client gets headers immediately
+      send({ ready: true });
+      try {
+        for await (const evt of streamClaude(prompt, {
+          allowedTools: ["Read"],
+          signal: ac.signal,
+        })) {
+          if (evt.type === "text") {
+            full += evt.text;
+            send({ delta: evt.text });
+          } else if (evt.type === "error") {
+            send({ error: evt.message });
+            db.prepare(
+              "UPDATE sessions SET lesson_status = 'error' WHERE id = ?",
+            ).run(sid);
+            controller.close();
+            return;
+          }
+        }
+        const title = extractTitle(full);
+        db.prepare(
+          "UPDATE sessions SET lesson_json = ?, lesson_status = 'done' WHERE id = ?",
+        ).run(JSON.stringify({ markdown: full, title }), sid);
+
+        // fire-and-forget: start quiz generation while kid reads
+        startQuizGeneration(sid);
+
+        send({ done: true, title });
+        controller.close();
+      } catch (err) {
+        send({ error: String(err) });
+        db.prepare(
+          "UPDATE sessions SET lesson_status = 'error' WHERE id = ?",
+        ).run(sid);
+        controller.close();
+      }
+    },
+    cancel() {
+      ac.abort();
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    },
+  });
+}
