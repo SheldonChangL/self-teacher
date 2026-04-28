@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { getParentStats } from "@/lib/stats";
-import { SUBJECTS, type Subject } from "@/lib/subjects";
+import { SUBJECTS } from "@/lib/subjects";
+import {
+  ActivityBarChart,
+  PieChart,
+  SUBJECT_COLORS,
+} from "@/components/Charts";
 
 export const dynamic = "force-dynamic";
 
@@ -19,12 +24,7 @@ function formatRelative(ts: number | null): string {
 export default function ParentDashboard() {
   const stats = getParentStats();
 
-  const topSubjects = SUBJECTS.map((s) => ({
-    ...s,
-    count: stats.totals.by_subject[s.id],
-  }))
-    .filter((s) => s.count > 0)
-    .sort((a, b) => b.count - a.count);
+  const hasSubjectData = stats.totals.lessons > 0;
 
   return (
     <main className="flex flex-1 flex-col items-center px-6 py-10">
@@ -61,40 +61,30 @@ export default function ParentDashboard() {
           />
         </div>
 
-        {/* Subject ranking */}
-        {topSubjects.length > 0 && (
+        {/* Activity chart */}
+        <section className="mt-8">
+          <h2 className="text-lg font-semibold text-zinc-700">
+            📅 近 30 天活動
+          </h2>
+          <div className="mt-3 rounded-2xl bg-white/80 p-4 ring-1 ring-amber-100">
+            <ActivityBarChart data={stats.activity_by_day} days={30} />
+          </div>
+        </section>
+
+        {/* Subject pie + ranking */}
+        {hasSubjectData && (
           <section className="mt-8">
             <h2 className="text-lg font-semibold text-zinc-700">
-              📊 熱門科目排行
+              📊 科目分佈
             </h2>
-            <div className="mt-3 space-y-2">
-              {topSubjects.map((s) => {
-                const pct = Math.round(
-                  (s.count / Math.max(1, stats.totals.lessons)) * 100,
-                );
-                return (
-                  <div
-                    key={s.id}
-                    className="flex items-center gap-3 rounded-2xl bg-white/80 p-3 ring-1 ring-amber-100"
-                  >
-                    <span className="w-12 text-2xl">{s.icon}</span>
-                    <span className="w-16 font-bold text-zinc-800">
-                      {s.label}
-                    </span>
-                    <div className="flex-1">
-                      <div className="h-3 w-full overflow-hidden rounded-full bg-amber-100">
-                        <div
-                          className="h-full rounded-full bg-amber-500"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    </div>
-                    <span className="w-20 text-right text-sm text-zinc-600">
-                      {s.count} 堂・{pct}%
-                    </span>
-                  </div>
-                );
-              })}
+            <div className="mt-3 rounded-2xl bg-white/80 p-5 ring-1 ring-amber-100">
+              <PieChart
+                slices={SUBJECTS.map((s) => ({
+                  ...s,
+                  count: stats.totals.by_subject[s.id],
+                  color: SUBJECT_COLORS[s.id],
+                }))}
+              />
             </div>
           </section>
         )}

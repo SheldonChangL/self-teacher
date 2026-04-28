@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { db, type Profile } from "@/lib/db";
 import { getKidStats, getKidSessions } from "@/lib/stats";
 import { SUBJECTS } from "@/lib/subjects";
+import { PieChart, ScoreLineChart, SUBJECT_COLORS } from "@/components/Charts";
 
 export const dynamic = "force-dynamic";
 
@@ -37,12 +38,12 @@ export default async function KidDetail({
     .map((s) => ({ date: s.created_at, score: s.score as number }))
     .reverse();
 
-  const subjectsRanked = SUBJECTS.map((s) => ({
+  const subjectsAll = SUBJECTS.map((s) => ({
     ...s,
     count: stats.by_subject[s.id],
-  }))
-    .filter((s) => s.count > 0)
-    .sort((a, b) => b.count - a.count);
+    color: SUBJECT_COLORS[s.id],
+  }));
+  const hasSubjectData = stats.lessons_total > 0;
 
   return (
     <main className="flex flex-1 flex-col items-center px-6 py-10">
@@ -91,68 +92,26 @@ export default async function KidDetail({
           />
         </div>
 
-        {/* Subject distribution */}
-        {subjectsRanked.length > 0 && (
+        {/* Subject pie chart */}
+        {hasSubjectData && (
           <section className="mt-8">
             <h2 className="text-lg font-semibold text-zinc-700">
               🎯 喜歡的科目
             </h2>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              {subjectsRanked.map((s) => {
-                const pct = Math.round(
-                  (s.count / Math.max(1, stats.lessons_total)) * 100,
-                );
-                return (
-                  <div
-                    key={s.id}
-                    className="flex items-center gap-3 rounded-2xl bg-white/80 px-4 py-3 ring-1 ring-amber-100"
-                  >
-                    <span className="text-2xl">{s.icon}</span>
-                    <span className="w-14 font-bold text-zinc-800">
-                      {s.label}
-                    </span>
-                    <div className="flex-1">
-                      <div className="h-2.5 overflow-hidden rounded-full bg-amber-100">
-                        <div
-                          className="h-full bg-amber-500"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    </div>
-                    <span className="w-14 text-right text-sm text-zinc-600">
-                      {s.count} 堂
-                    </span>
-                  </div>
-                );
-              })}
+            <div className="mt-3 rounded-2xl bg-white/80 p-5 ring-1 ring-amber-100">
+              <PieChart slices={subjectsAll} />
             </div>
           </section>
         )}
 
-        {/* Recent score trend (text version, real chart in v4) */}
+        {/* Score trend line chart */}
         {scoreHistory.length > 0 && (
           <section className="mt-8" data-testid="score-trend">
             <h2 className="text-lg font-semibold text-zinc-700">
               📈 測驗成績變化
             </h2>
-            <div className="mt-3 flex flex-wrap gap-2 rounded-2xl bg-white/80 p-4 ring-1 ring-amber-100">
-              {scoreHistory.map((h, i) => {
-                const tone =
-                  h.score >= 4
-                    ? "bg-emerald-100 text-emerald-700"
-                    : h.score >= 3
-                      ? "bg-amber-100 text-amber-700"
-                      : "bg-rose-100 text-rose-700";
-                return (
-                  <span
-                    key={i}
-                    className={`rounded-full px-3 py-1 text-sm font-medium ${tone}`}
-                    title={fmt(h.date)}
-                  >
-                    {h.score}/5
-                  </span>
-                );
-              })}
+            <div className="mt-3 rounded-2xl bg-white/80 p-4 ring-1 ring-amber-100">
+              <ScoreLineChart points={scoreHistory} />
             </div>
           </section>
         )}
