@@ -56,6 +56,13 @@ export default function Home() {
           </p>
         )}
       </section>
+
+      <Link
+        href="/parent"
+        className="fixed bottom-4 right-4 rounded-full bg-white/80 px-4 py-2 text-sm text-zinc-500 shadow-sm ring-1 ring-amber-100 transition hover:bg-white hover:text-amber-700"
+      >
+        👨‍👩‍👧 家長後台
+      </Link>
     </main>
   );
 }
