@@ -137,7 +137,9 @@ export default function QuizPage({
 
         <div className="mt-4 rounded-3xl bg-white/90 p-6 shadow-lg ring-1 ring-amber-100">
           <p className="text-xl font-semibold text-zinc-800">{q.q_zh}</p>
-          <p className="mt-1 text-base italic text-zinc-500">{q.q_en}</p>
+          {q.q_en?.trim() && (
+            <p className="mt-1 text-base italic text-zinc-500">{q.q_en}</p>
+          )}
 
           <div className="mt-5 grid gap-3">
             {q.options.map((o, i) => {
@@ -176,7 +178,9 @@ export default function QuizPage({
                 {result === "correct" ? "🎉 答對了！" : "💡 沒關係，看一下："}
               </p>
               <p className="mt-1">{q.explain_zh}</p>
-              <p className="mt-1 italic">{q.explain_en}</p>
+              {q.explain_en?.trim() && (
+                <p className="mt-1 italic">{q.explain_en}</p>
+              )}
             </div>
           )}
 

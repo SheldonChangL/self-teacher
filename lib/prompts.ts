@@ -1,8 +1,5 @@
 import type { Profile, Subject } from "./db";
 
-const langName = (l: string) =>
-  l === "zh" ? "純繁體中文（台灣用法）" : l === "en" ? "純英文" : "繁體中文（台灣用法） + 英文雙語";
-
 function difficultyHint(age: number) {
   if (age <= 5)
     return "用最最簡單的字詞跟句子（每句不超過 10 個中文字），多用注音符號或顏色形狀的形容";
@@ -14,10 +11,10 @@ function difficultyHint(age: number) {
 }
 
 type SubjectPlaybook = {
-  label: string; // 顯示名稱
-  focus: string; // 在 prompt 中強調的「找什麼」
-  style: string; // 教學風格
-  sectionHint: string; // 段落主題建議
+  label: string;
+  focus: string;
+  style: string;
+  sectionHint: string;
 };
 
 const PLAYBOOKS: Record<Subject, SubjectPlaybook> = {
@@ -33,7 +30,7 @@ const PLAYBOOKS: Record<Subject, SubjectPlaybook> = {
     focus:
       "認真辨認照片中的中文字、詞語、句子或注音；如果是課本/作業也請一起讀懂題目",
     style:
-      "像國語老師一樣，先認字（含注音）、再說意思、再造個簡單例句；遇到成語或句型要解釋；不要把英文當主角",
+      "像國語老師一樣，先認字（含注音）、再說意思、再造個簡單例句；遇到成語或句型要解釋",
     sectionHint:
       "兩段：第一段「認字 / 詞語小教室」，第二段「造句或語感練習」；單字段請改名為「重要詞語」並列出 注音 — 詞 — 意思",
   },
@@ -74,6 +71,55 @@ const PLAYBOOKS: Record<Subject, SubjectPlaybook> = {
   },
 };
 
+const TC_REMINDER =
+  "中文一律用「繁體中文／台灣用法」，常見字差異例如：開心（不是开心）、學（不是学）、這（不是这）、什麼（不是什么）、認識（不是认识）、為（不是为）、體（不是体）、個（不是个）";
+
+function bilingualSkeleton(): string {
+  return `# {一個有趣的標題（中文 / English）}
+
+{2~3 句開場白：先一段中文，再一段對應英文}
+
+## 🌟 {第一段標題（中文 / English）}
+
+{第一段內容：先中文，再對應英文}
+
+## 🌟 {第二段標題（中文 / English）}
+
+{第二段內容：先中文，再對應英文}
+
+**🔤 重要單字 / Words to learn**
+- **{english word}** {KK 音標} — {中文意思}
+- **{english word}** {KK 音標} — {中文意思}
+
+## 🎉 有趣的小知識 / Fun Facts
+
+* {一條中文小知識}
+* {Another fun fact in English}`;
+}
+
+function chineseSkeleton(): string {
+  return `# {一個有趣的中文標題}
+
+{2~3 句中文開場白}
+
+## 🌟 {第一段中文標題}
+
+{第一段中文內容}
+
+## 🌟 {第二段中文標題}
+
+{第二段中文內容}
+
+**🔤 重要詞彙**
+- {詞} {注音／音標} — {中文意思}
+- {詞} {注音／音標} — {中文意思}
+
+## 🎉 有趣的小知識
+
+* {一條中文小知識}
+* {再一條中文小知識}`;
+}
+
 export function buildLessonPrompt(opts: {
   profile: Profile;
   imageRelPaths: string[];
@@ -83,7 +129,13 @@ export function buildLessonPrompt(opts: {
   const { profile, imageRelPaths, subject, hint } = opts;
   const pb = PLAYBOOKS[subject] ?? PLAYBOOKS.free;
   const imgList = imageRelPaths.map((p) => `- ${p}`).join("\n");
-  const lang = langName(profile.lang_pref);
+  const isEnglish = subject === "english";
+  const lang = isEnglish ? "繁體中文（台灣用法） + 英文雙語" : "純繁體中文（台灣用法）";
+  const skeleton = isEnglish ? bilingualSkeleton() : chineseSkeleton();
+  const englishRule = isEnglish
+    ? "因為這是英文課，每段都要中英對照，幫小朋友建立中英連結"
+    : "整份教材**只用繁體中文**，不要夾雜任何英文句子或翻譯（除非照片裡本來就有英文，那就引用該英文並用中文解釋）";
+
   const hintLine = hint?.trim()
     ? `\n小朋友 / 家長補充：「${hint.trim()}」（請優先處理這個需求）\n`
     : "";
@@ -99,38 +151,21 @@ ${hintLine}
 
 撰寫規則：
 - ${difficultyHint(profile.age)}
+- ${englishRule}
 - 千萬不要編造照片中沒有的東西；如果照片不清楚，就誠實告訴小朋友「老師看不太清楚耶，可以再拍一張嗎？」並仍然就看得見的部分教
-- 字數總共控制在 250~450 字（含中英文）
+- 字數總共控制在 250~450 字
 - 風格要溫柔、鼓勵、像跟小朋友說話
 - 段落結構：${pb.sectionHint}
 
-請用 Markdown 格式輸出，依下列骨架（你可以依科目調整單字段名稱，但結構要照走）：
+請用 Markdown 格式輸出，依下列骨架：
 
-# {一個有趣的標題（中文 / English）}
-
-{2~3 句的開場白（雙語就先中文再英文，純中或純英就只用該語言）}
-
-## 🌟 {第一段標題}
-
-{第一段內容}
-
-## 🌟 {第二段標題}
-
-{第二段內容}
-
-**🔤 重要單字 / Words to learn**
-- **{詞或英文}** {音標或注音} — {中文意思}
-
-## 🎉 有趣的小知識 / Fun Facts
-
-* {一條有趣的事實或練習邀請}
-* {再一條}
+${skeleton}
 
 非常重要：
 1. 直接輸出 Markdown，不要包在 \`\`\` 裡，也不要任何前後的說明
 2. 不要呼叫除了 Read 之外的工具
 3. 不要加額外的章節，照骨架就好
-4. 中文一律用「繁體中文／台灣用法」，常見字差異例如：開心（不是开心）、學（不是学）、這（不是这）、什麼（不是什么）、認識（不是认识）、麼（不是么）、為（不是为）、體（不是体）、個（不是个）`;
+4. ${TC_REMINDER}`;
 }
 
 export function buildQuizPrompt(opts: {
@@ -140,6 +175,23 @@ export function buildQuizPrompt(opts: {
 }): string {
   const { profile, lessonMarkdown, subject } = opts;
   const pb = PLAYBOOKS[subject] ?? PLAYBOOKS.free;
+  const isEnglish = subject === "english";
+
+  const langRule = isEnglish
+    ? `- 題目要中英雙語：q_zh 是中文版題目，q_en 是對應英文版；options 可中英混合
+- explain_zh 是中文解釋，explain_en 是對應英文解釋（簡短即可）`
+    : `- 題目、選項、解釋全部使用**純繁體中文**
+- q_en、explain_en 一律輸出空字串 ""
+- 不要在中文題目或選項裡夾雜英文`;
+
+  const focusHint = isEnglish
+    ? "考拼字、發音、意思、簡單句型"
+    : pb.label === "國語"
+      ? "考字音、字義、詞語使用"
+      : pb.label === "數學"
+        ? "出能算的數字題或概念題"
+        : "考觀察、理解、應用";
+
   return `你是兒童「${pb.label}」測驗出題老師。請根據下面這份教材，幫 ${profile.age} 歲的「${profile.name}」出 5 題小測驗（單選題，4 選 1）。
 
 教材內容：
@@ -149,14 +201,13 @@ ${lessonMarkdown}
 
 規則：
 - 5 題單選題，每題 4 個選項
-- 題目要中英雙語，選項可以是中英混合
+${langRule}
 - 難度配合 ${profile.age} 歲的程度
-- 題目要扣回教材內容
-- 數學題請給能算的數字題；國語題可考字音字義或詞語使用；英文題可考拼字、發音、意思；自然/社會考觀察與理解
+- 題目要扣回教材內容；${focusHint}
 - explain 要簡短鼓勵，例如「答對了！...」
 - 答案分布要平均（不要全是同一個 index）
 
-中文一律使用繁體中文（台灣用法）。
+${TC_REMINDER}
 
 輸出格式：**只輸出 JSON**，不要包 \`\`\`，不要任何前後文字：
 
@@ -164,11 +215,11 @@ ${lessonMarkdown}
   "questions": [
     {
       "q_zh": "中文題目",
-      "q_en": "English version",
+      "q_en": "${isEnglish ? "English version" : ""}",
       "options": ["選項1", "選項2", "選項3", "選項4"],
       "answer_index": 0,
       "explain_zh": "中文解釋",
-      "explain_en": "English explanation"
+      "explain_en": "${isEnglish ? "English explanation" : ""}"
     }
   ]
 }`;
