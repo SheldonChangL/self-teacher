@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { LoadingMascot } from "@/components/LoadingMascot";
+import { WaitGame } from "@/components/WaitGame";
 import { BackLink } from "@/components/BackLink";
 import type { Quiz } from "@/lib/quiz-runner";
 
@@ -74,15 +74,15 @@ export default function QuizPage({
       <main className="flex flex-1 flex-col items-center px-6 py-8">
         <div className="w-full max-w-xl rounded-3xl bg-white/90 p-6 shadow-lg ring-1 ring-amber-100">
           <BackLink href={`/kid/${id}/lesson/${sid}`}>回課文</BackLink>
-          <LoadingMascot
-            message={
-              status === "running" || status === "pending"
-                ? "出題中…再等老師一下下！"
-                : status === "error"
-                  ? "出題出狀況了，再試一次..."
-                  : "載入中…"
-            }
-          />
+          <div className="mt-4">
+            <WaitGame
+              message={
+                status === "error"
+                  ? "出題出狀況了，再試一次…"
+                  : "出題中…邊玩邊等吧！"
+              }
+            />
+          </div>
         </div>
       </main>
     );

@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Markdown } from "@/components/Markdown";
-import { LoadingMascot } from "@/components/LoadingMascot";
 import { TTSButton } from "@/components/TTSButton";
 import { BackLink } from "@/components/BackLink";
+import { WaitGame } from "@/components/WaitGame";
 
 type State = "loading" | "streaming" | "done" | "error";
 
@@ -118,7 +118,7 @@ export function LessonView({
 
         <div className="mt-4 rounded-3xl bg-white/90 p-6 shadow-lg ring-1 ring-amber-100">
           {text === "" && state !== "error" && (
-            <LoadingMascot message="老師正在認真看你的照片喔～" />
+            <WaitGame message="老師正在認真看你的照片，邊玩邊等吧！" />
           )}
 
           {text !== "" && (
