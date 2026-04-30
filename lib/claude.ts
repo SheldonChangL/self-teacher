@@ -36,6 +36,7 @@ function buildArgs(prompt: string, opts: ClaudeRunOptions) {
 
 export type ClaudeEvent =
   | { type: "text"; text: string }
+  | { type: "cost"; costUsd: number }
   | { type: "done"; full: string }
   | { type: "error"; message: string };
 
@@ -117,6 +118,7 @@ export async function* streamClaude(
     if (!evt || typeof evt !== "object") continue;
     const e = evt as {
       type?: string;
+      total_cost_usd?: number;
       event?: {
         type?: string;
         index?: number;
@@ -125,6 +127,10 @@ export async function* streamClaude(
       };
     };
 
+    if (e.type === "result" && typeof e.total_cost_usd === "number") {
+      yield { type: "cost", costUsd: e.total_cost_usd };
+      continue;
+    }
     if (e.type !== "stream_event" || !e.event) continue;
     const ev = e.event;
     if (ev.type === "content_block_start" && ev.content_block?.type === "text") {
@@ -156,12 +162,14 @@ export async function* streamClaude(
 export async function runClaude(
   prompt: string,
   opts: ClaudeRunOptions = {},
-): Promise<string> {
+): Promise<{ text: string; costUsd: number }> {
   let full = "";
+  let costUsd = 0;
   for await (const e of streamClaude(prompt, opts)) {
     if (e.type === "text") full += e.text;
+    else if (e.type === "cost") costUsd = e.costUsd;
     else if (e.type === "error") throw new Error(e.message);
     else if (e.type === "done") full = e.full;
   }
-  return full;
+  return { text: full, costUsd };
 }

@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import { db, Profile, Subject, SUBJECTS } from "@/lib/db";
 import { newId } from "@/lib/id";
 import { publishProfileEvent } from "@/lib/events";
+import { canStart } from "@/lib/limits";
 
 const VALID_SUBJECTS = new Set(SUBJECTS.map((s) => s.id));
 
@@ -19,6 +20,18 @@ export async function POST(req: Request) {
     .get(profileId) as Profile | undefined;
   if (!profile) {
     return NextResponse.json({ error: "找不到 profile" }, { status: 400 });
+  }
+
+  const limit = canStart(profileId);
+  if (!limit.allowed) {
+    const msg =
+      limit.reason === "daily"
+        ? `今天已經學了 ${limit.current} 堂，達到 ${limit.limit} 堂上限囉，明天再來吧！`
+        : `這個月 AI 花費 $${limit.current.toFixed(2)} 已超過預算 $${limit.limit.toFixed(2)}，先讓家長調整一下吧。`;
+    return NextResponse.json(
+      { error: msg, reason: limit.reason },
+      { status: 429 },
+    );
   }
 
   const files = form.getAll("images").filter((v): v is File => v instanceof File);

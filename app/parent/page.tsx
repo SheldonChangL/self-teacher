@@ -3,6 +3,8 @@ import { getParentStats } from "@/lib/stats";
 import { BackLink } from "@/components/BackLink";
 import { ProfileSettingsModal } from "@/components/ProfileSettingsModal";
 import { ParentLogoutButton } from "@/components/ParentLogoutButton";
+import { CostHero } from "@/components/CostHero";
+import { getCostStats } from "@/lib/limits";
 import { SUBJECTS } from "@/lib/subjects";
 import {
   ActivityBarChart,
@@ -28,6 +30,7 @@ export default function ParentDashboard() {
   const stats = getParentStats();
 
   const hasSubjectData = stats.totals.lessons > 0;
+  const cost = getCostStats();
 
   return (
     <main className="flex flex-1 flex-col items-center px-6 py-10">
@@ -62,6 +65,14 @@ export default function ParentDashboard() {
               .filter((d) => Date.now() - new Date(d.date).getTime() < 7 * 86400_000)
               .reduce((a, b) => a + b.count, 0)}
             icon="📈"
+          />
+        </div>
+
+        <div className="mt-4">
+          <CostHero
+            monthUsd={cost.month_usd}
+            budgetUsd={cost.budget_usd}
+            dailyLimit={cost.daily_limit}
           />
         </div>
 

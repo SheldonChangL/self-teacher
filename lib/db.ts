@@ -66,6 +66,16 @@ function open() {
       ON vocab_cards(profile_id, next_review_at);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_vocab_uniq
       ON vocab_cards(profile_id, front);
+
+    CREATE TABLE IF NOT EXISTS cost_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      profile_id TEXT,
+      kind TEXT NOT NULL,
+      cost_usd REAL NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_cost_created
+      ON cost_log(created_at DESC);
   `);
 
   // Backfill columns if migrating from an older schema.

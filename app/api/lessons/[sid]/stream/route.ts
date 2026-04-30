@@ -97,6 +97,7 @@ export async function GET(
   const stream = new ReadableStream({
     async start(controller) {
       let full = "";
+      let costUsd = 0;
       const send = (obj: unknown) =>
         controller.enqueue(enc.encode(`data: ${JSON.stringify(obj)}\n\n`));
       // initial heartbeat so client gets headers immediately
@@ -109,6 +110,8 @@ export async function GET(
           if (evt.type === "text") {
             full += evt.text;
             send({ delta: evt.text });
+          } else if (evt.type === "cost") {
+            costUsd = evt.costUsd;
           } else if (evt.type === "error") {
             send({ error: evt.message });
             db.prepare(
@@ -125,6 +128,13 @@ export async function GET(
 
         bumpDailyActivity(session.profile_id);
         addCardsForLesson(session.profile_id, sid, full);
+
+        if (costUsd > 0) {
+          db.prepare(
+            `INSERT INTO cost_log (profile_id, kind, cost_usd, created_at)
+             VALUES (?, 'lesson', ?, ?)`,
+          ).run(session.profile_id, costUsd, Date.now());
+        }
 
         // fire-and-forget: start quiz generation while kid reads
         startQuizGeneration(sid);
