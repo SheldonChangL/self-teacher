@@ -51,6 +51,21 @@ function open() {
       lessons_count INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY (profile_id, date)
     );
+
+    CREATE TABLE IF NOT EXISTS vocab_cards (
+      id TEXT PRIMARY KEY,
+      profile_id TEXT NOT NULL,
+      front TEXT NOT NULL,
+      back TEXT NOT NULL,
+      source_session_id TEXT,
+      ease INTEGER NOT NULL DEFAULT 0,
+      next_review_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_vocab_due
+      ON vocab_cards(profile_id, next_review_at);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_vocab_uniq
+      ON vocab_cards(profile_id, front);
   `);
 
   // Backfill columns if migrating from an older schema.

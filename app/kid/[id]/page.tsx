@@ -8,6 +8,7 @@ import { PairingQR } from "@/components/PairingQR";
 import { BackLink } from "@/components/BackLink";
 import { StreakChip } from "@/components/StreakChip";
 import { getStreak } from "@/lib/streak";
+import { dueCount } from "@/lib/vocab";
 
 const SUBJECT_BY_ID = Object.fromEntries(SUBJECTS.map((s) => [s.id, s]));
 
@@ -45,6 +46,7 @@ export default async function KidHome({
     color: { dark: "#92400e", light: "#ffffff" },
   });
   const streak = getStreak(id);
+  const reviewDue = dueCount(id);
 
   return (
     <main className="flex flex-1 flex-col items-center px-6 py-10">
@@ -84,6 +86,15 @@ export default async function KidHome({
             <p className="text-sm text-zinc-500">
               （沒用電視＋手機時，點這個就好）
             </p>
+
+            {reviewDue > 0 && (
+              <Link
+                href={`/kid/${id}/review`}
+                className="flex items-center justify-center gap-3 rounded-3xl bg-gradient-to-r from-violet-400 to-fuchsia-400 px-6 py-5 text-xl font-bold text-white shadow-lg transition hover:scale-[1.02]"
+              >
+                📚 今日複習（{reviewDue} 個）
+              </Link>
+            )}
 
             <h2 className="mt-2 text-xl font-semibold text-zinc-700">
               以前學過的 📚

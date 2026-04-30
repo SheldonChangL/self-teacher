@@ -3,6 +3,7 @@ import { streamClaude } from "@/lib/claude";
 import { buildLessonPrompt, buildRegeneratePrompt } from "@/lib/prompts";
 import { startQuizGeneration } from "@/lib/quiz-runner";
 import { bumpDailyActivity } from "@/lib/streak";
+import { addCardsForLesson } from "@/lib/vocab";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -123,6 +124,7 @@ export async function GET(
         ).run(JSON.stringify({ markdown: full, title }), sid);
 
         bumpDailyActivity(session.profile_id);
+        addCardsForLesson(session.profile_id, sid, full);
 
         // fire-and-forget: start quiz generation while kid reads
         startQuizGeneration(sid);
