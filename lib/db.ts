@@ -44,6 +44,13 @@ function open() {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS daily_activity (
+      profile_id TEXT NOT NULL,
+      date TEXT NOT NULL,
+      lessons_count INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (profile_id, date)
+    );
   `);
 
   // Backfill columns if migrating from an older schema.

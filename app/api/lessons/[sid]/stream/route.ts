@@ -2,6 +2,7 @@ import { db, Profile, Session } from "@/lib/db";
 import { streamClaude } from "@/lib/claude";
 import { buildLessonPrompt, buildRegeneratePrompt } from "@/lib/prompts";
 import { startQuizGeneration } from "@/lib/quiz-runner";
+import { bumpDailyActivity } from "@/lib/streak";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -120,6 +121,8 @@ export async function GET(
         db.prepare(
           "UPDATE sessions SET lesson_json = ?, lesson_status = 'done' WHERE id = ?",
         ).run(JSON.stringify({ markdown: full, title }), sid);
+
+        bumpDailyActivity(session.profile_id);
 
         // fire-and-forget: start quiz generation while kid reads
         startQuizGeneration(sid);

@@ -6,6 +6,8 @@ import { db, Profile, Session } from "@/lib/db";
 import { SUBJECTS } from "@/lib/subjects";
 import { PairingQR } from "@/components/PairingQR";
 import { BackLink } from "@/components/BackLink";
+import { StreakChip } from "@/components/StreakChip";
+import { getStreak } from "@/lib/streak";
 
 const SUBJECT_BY_ID = Object.fromEntries(SUBJECTS.map((s) => [s.id, s]));
 
@@ -42,6 +44,7 @@ export default async function KidHome({
     width: 320,
     color: { dark: "#92400e", light: "#ffffff" },
   });
+  const streak = getStreak(id);
 
   return (
     <main className="flex flex-1 flex-col items-center px-6 py-10">
@@ -59,6 +62,10 @@ export default async function KidHome({
             </p>
           </div>
         </header>
+
+        <div className="mt-5">
+          <StreakChip streak={streak} />
+        </div>
 
         <div className="mt-8 grid gap-6 md:grid-cols-2">
           <PairingQR
