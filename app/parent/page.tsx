@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getParentStats } from "@/lib/stats";
 import { BackLink } from "@/components/BackLink";
 import { ProfileSettingsModal } from "@/components/ProfileSettingsModal";
+import { ParentLogoutButton } from "@/components/ParentLogoutButton";
 import { SUBJECTS } from "@/lib/subjects";
 import {
   ActivityBarChart,
@@ -33,9 +34,12 @@ export default function ParentDashboard() {
       <div className="w-full max-w-5xl">
         <div className="flex items-center justify-between">
           <BackLink href="/">回首頁</BackLink>
-          <span className="text-xs text-zinc-400">
-            最後更新：{new Date().toLocaleString("zh-TW")}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-zinc-400">
+              最後更新：{new Date().toLocaleString("zh-TW")}
+            </span>
+            <ParentLogoutButton />
+          </div>
         </div>
 
         <header className="mt-2">

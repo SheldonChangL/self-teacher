@@ -39,6 +39,11 @@ function open() {
     );
 
     CREATE INDEX IF NOT EXISTS idx_sessions_profile ON sessions(profile_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `);
 
   // Backfill columns if migrating from an older schema.
@@ -70,6 +75,20 @@ export type { Subject } from "./subjects";
 export { SUBJECTS } from "./subjects";
 
 import type { Subject } from "./subjects";
+
+export function getSetting(key: string): string | null {
+  const row = db
+    .prepare("SELECT value FROM settings WHERE key = ?")
+    .get(key) as { value: string } | undefined;
+  return row?.value ?? null;
+}
+
+export function setSetting(key: string, value: string): void {
+  db.prepare(
+    `INSERT INTO settings (key, value) VALUES (?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+  ).run(key, value);
+}
 
 export type Session = {
   id: string;
