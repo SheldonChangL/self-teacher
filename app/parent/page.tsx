@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getParentStats } from "@/lib/stats";
 import { BackLink } from "@/components/BackLink";
+import { ProfileSettingsModal } from "@/components/ProfileSettingsModal";
 import { SUBJECTS } from "@/lib/subjects";
 import {
   ActivityBarChart,
@@ -103,11 +104,10 @@ export default function ParentDashboard() {
           ) : (
             <div className="mt-3 grid gap-4 md:grid-cols-2">
               {stats.kids.map((k) => (
-                <Link
+                <div
                   key={k.id}
-                  href={`/parent/${k.id}`}
                   data-testid={`kid-card-${k.id}`}
-                  className="block rounded-3xl bg-white/90 p-5 shadow-sm ring-1 ring-amber-100 transition hover:shadow-md"
+                  className="rounded-3xl bg-white/90 p-5 shadow-sm ring-1 ring-amber-100 transition hover:shadow-md"
                 >
                   <div className="flex items-center gap-4">
                     <span className="text-5xl">{k.avatar}</span>
@@ -119,9 +119,21 @@ export default function ParentDashboard() {
                         {k.age} 歲・最後活動 {formatRelative(k.last_activity_at)}
                       </p>
                     </div>
-                    <span className="text-sm text-amber-700 hover:underline">
+                    <ProfileSettingsModal
+                      profile={{
+                        id: k.id,
+                        name: k.name,
+                        avatar: k.avatar,
+                        age: k.age,
+                        lang_pref: k.lang_pref,
+                      }}
+                    />
+                    <Link
+                      href={`/parent/${k.id}`}
+                      className="text-sm text-amber-700 hover:underline"
+                    >
                       看詳情 →
-                    </span>
+                    </Link>
                   </div>
                   <div className="mt-4 grid grid-cols-3 gap-2 text-center">
                     <MiniStat
@@ -169,7 +181,7 @@ export default function ParentDashboard() {
                       </ul>
                     </div>
                   )}
-                </Link>
+                </div>
               ))}
             </div>
           )}

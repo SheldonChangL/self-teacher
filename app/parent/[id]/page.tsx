@@ -5,6 +5,8 @@ import { getKidStats, getKidSessions } from "@/lib/stats";
 import { SUBJECTS } from "@/lib/subjects";
 import { PieChart, ScoreLineChart, SUBJECT_COLORS } from "@/components/Charts";
 import { BackLink } from "@/components/BackLink";
+import { SessionDeleteButton } from "@/components/SessionDeleteButton";
+import { ProfileSettingsModal } from "@/components/ProfileSettingsModal";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +55,7 @@ export default async function KidDetail({
 
         <header className="mt-2 flex items-center gap-5">
           <span className="text-7xl">{profile.avatar}</span>
-          <div>
+          <div className="flex-1">
             <h1 className="text-4xl font-extrabold text-amber-700">
               {profile.name}
             </h1>
@@ -62,6 +64,7 @@ export default async function KidDetail({
               {new Date(profile.created_at).toLocaleDateString("zh-TW")}
             </p>
           </div>
+          <ProfileSettingsModal profile={profile} />
         </header>
 
         {/* Hero numbers */}
@@ -127,10 +130,13 @@ export default async function KidDetail({
                 const subj =
                   SUBJECT_BY_ID[s.subject] ?? SUBJECT_BY_ID.free;
                 return (
-                  <li key={s.id}>
+                  <li
+                    key={s.id}
+                    className="flex items-center gap-3 px-5 py-3 transition hover:bg-amber-50"
+                  >
                     <Link
                       href={`/kid/${profile.id}/lesson/${s.id}`}
-                      className="flex items-center gap-3 px-5 py-3 transition hover:bg-amber-50"
+                      className="flex flex-1 items-center gap-3 truncate"
                     >
                       <span
                         className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800"
@@ -158,6 +164,7 @@ export default async function KidDetail({
                         </span>
                       )}
                     </Link>
+                    <SessionDeleteButton sessionId={s.id} title={s.title} />
                   </li>
                 );
               })}

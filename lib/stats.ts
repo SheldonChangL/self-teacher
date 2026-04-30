@@ -6,6 +6,7 @@ export type KidStats = {
   name: string;
   avatar: string;
   age: number;
+  lang_pref: string;
   lessons_total: number;
   lessons_done: number;
   quizzes_taken: number;
@@ -76,6 +77,7 @@ export function getKidStats(profile: Profile): KidStats {
     name: profile.name,
     avatar: profile.avatar,
     age: profile.age,
+    lang_pref: profile.lang_pref,
     lessons_total: sessions.length,
     lessons_done,
     quizzes_taken,
