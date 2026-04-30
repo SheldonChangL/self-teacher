@@ -57,6 +57,12 @@ function open() {
   if (!has("hint")) {
     db.exec("ALTER TABLE sessions ADD COLUMN hint TEXT NOT NULL DEFAULT ''");
   }
+  if (!has("feedback")) {
+    db.exec("ALTER TABLE sessions ADD COLUMN feedback TEXT");
+  }
+  if (!has("prev_lesson_id")) {
+    db.exec("ALTER TABLE sessions ADD COLUMN prev_lesson_id TEXT");
+  }
   return db;
 }
 
@@ -101,6 +107,8 @@ export type Session = {
   quiz_json: string | null;
   quiz_status: "pending" | "running" | "done" | "error";
   score: number | null;
+  feedback: "up" | "down" | null;
+  prev_lesson_id: string | null;
   created_at: number;
 };
 

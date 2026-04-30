@@ -1,6 +1,6 @@
 import { db, Profile, Session } from "@/lib/db";
 import { streamClaude } from "@/lib/claude";
-import { buildLessonPrompt } from "@/lib/prompts";
+import { buildLessonPrompt, buildRegeneratePrompt } from "@/lib/prompts";
 import { startQuizGeneration } from "@/lib/quiz-runner";
 
 export const runtime = "nodejs";
@@ -53,12 +53,36 @@ export async function GET(
   }
 
   const imagePaths = JSON.parse(session.image_paths) as string[];
-  const prompt = buildLessonPrompt({
-    profile,
-    imageRelPaths: imagePaths,
-    subject: session.subject,
-    hint: session.hint,
-  });
+
+  // Strip the [regenerate:mode] tag from hint before passing to prompts
+  const regenMatch = session.hint.match(/^\[regenerate:(simpler|angle)\]\s*(.*)$/);
+  const cleanHint = regenMatch ? regenMatch[2] : session.hint;
+  const regenMode = regenMatch ? (regenMatch[1] as "simpler" | "angle") : null;
+
+  let prompt: string;
+  if (regenMode && session.prev_lesson_id) {
+    const prev = db
+      .prepare("SELECT lesson_json FROM sessions WHERE id = ?")
+      .get(session.prev_lesson_id) as { lesson_json: string | null } | undefined;
+    const prevMd = prev?.lesson_json
+      ? (JSON.parse(prev.lesson_json) as { markdown?: string }).markdown ?? ""
+      : "";
+    prompt = buildRegeneratePrompt({
+      profile,
+      imageRelPaths: imagePaths,
+      subject: session.subject,
+      hint: cleanHint,
+      previousMarkdown: prevMd,
+      mode: regenMode,
+    });
+  } else {
+    prompt = buildLessonPrompt({
+      profile,
+      imageRelPaths: imagePaths,
+      subject: session.subject,
+      hint: cleanHint,
+    });
+  }
 
   db.prepare("UPDATE sessions SET lesson_status = 'running' WHERE id = ?").run(
     sid,

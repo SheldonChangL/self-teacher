@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Markdown } from "@/components/Markdown";
 import { TTSButton } from "@/components/TTSButton";
 import { BackLink } from "@/components/BackLink";
@@ -14,17 +15,47 @@ export function LessonView({
   sessionId,
   initialText,
   initialDone,
+  initialFeedback,
 }: {
   kidId: string;
   sessionId: string;
   initialText: string;
   initialDone: boolean;
+  initialFeedback: "up" | "down" | null;
 }) {
+  const router = useRouter();
   const [text, setText] = useState(initialText);
   const [state, setState] = useState<State>(initialDone ? "done" : "loading");
   const [err, setErr] = useState<string | null>(null);
   const [quizReady, setQuizReady] = useState(false);
+  const [feedback, setFeedback] = useState<"up" | "down" | null>(initialFeedback);
+  const [regenBusy, setRegenBusy] = useState(false);
   const startedRef = useRef(false);
+
+  async function rate(value: "up" | "down") {
+    const next = feedback === value ? null : value;
+    setFeedback(next);
+    await fetch(`/api/sessions/${sessionId}/feedback`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ feedback: next }),
+    });
+  }
+
+  async function regenerate(mode: "simpler" | "angle") {
+    setRegenBusy(true);
+    const res = await fetch(`/api/sessions/${sessionId}/regenerate`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ mode }),
+    });
+    if (!res.ok) {
+      setRegenBusy(false);
+      return;
+    }
+    const { session_id } = await res.json();
+    router.push(`/kid/${kidId}/lesson/${session_id}`);
+  }
 
   useEffect(() => {
     // Already cached → no need to stream.
@@ -140,6 +171,48 @@ export function LessonView({
         {state === "done" && (
           <div className="mt-6 flex flex-col items-center gap-4">
             <TTSButton text={text} />
+
+            <div className="flex w-full items-center justify-center gap-2">
+              <button
+                onClick={() => rate("up")}
+                aria-label="課文很棒"
+                className={`flex-1 rounded-2xl py-3 text-2xl shadow-sm transition active:scale-95 ${
+                  feedback === "up"
+                    ? "bg-emerald-500 text-white"
+                    : "bg-white text-zinc-700 ring-1 ring-amber-100 hover:bg-emerald-50"
+                }`}
+              >
+                👍
+              </button>
+              <button
+                onClick={() => rate("down")}
+                aria-label="課文不好"
+                className={`flex-1 rounded-2xl py-3 text-2xl shadow-sm transition active:scale-95 ${
+                  feedback === "down"
+                    ? "bg-rose-500 text-white"
+                    : "bg-white text-zinc-700 ring-1 ring-amber-100 hover:bg-rose-50"
+                }`}
+              >
+                👎
+              </button>
+              <button
+                onClick={() => regenerate("simpler")}
+                disabled={regenBusy}
+                title="再講一次（更簡單）"
+                className="flex-1 rounded-2xl bg-white py-3 text-base font-bold text-amber-700 shadow-sm ring-1 ring-amber-100 transition hover:bg-amber-50 active:scale-95 disabled:opacity-50"
+              >
+                {regenBusy ? "…" : "🔁 簡單一點"}
+              </button>
+              <button
+                onClick={() => regenerate("angle")}
+                disabled={regenBusy}
+                title="換個角度再講一次"
+                className="flex-1 rounded-2xl bg-white py-3 text-base font-bold text-amber-700 shadow-sm ring-1 ring-amber-100 transition hover:bg-amber-50 active:scale-95 disabled:opacity-50"
+              >
+                {regenBusy ? "…" : "🎲 換個說法"}
+              </button>
+            </div>
+
             <Link
               href={`/kid/${kidId}/quiz/${sessionId}`}
               className="w-full rounded-3xl bg-gradient-to-r from-emerald-400 to-sky-400 py-5 text-center text-2xl font-bold text-white shadow-lg transition hover:scale-[1.01]"

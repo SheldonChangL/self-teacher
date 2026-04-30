@@ -168,6 +168,37 @@ ${skeleton}
 4. ${TC_REMINDER}`;
 }
 
+export function buildRegeneratePrompt(opts: {
+  profile: Profile;
+  imageRelPaths: string[];
+  subject: Subject;
+  hint?: string;
+  previousMarkdown: string;
+  mode: "simpler" | "angle";
+}): string {
+  const base = buildLessonPrompt({
+    profile: opts.profile,
+    imageRelPaths: opts.imageRelPaths,
+    subject: opts.subject,
+    hint: opts.hint,
+  });
+  const directive =
+    opts.mode === "simpler"
+      ? "上次的說法對學生太難了。請改用「更簡單、句子更短、舉的例子更生活化」的方式重新講一次。可以多用「就像…」、「想像看看…」這類比喻句。"
+      : "請從「完全不同的角度」切入講解（例如改換主題、改換切入點、改換比喻）。內容跟結構不能跟上次重複，要讓學生覺得是新東西。";
+
+  return `${base}
+
+────────────────────────────
+這是「再講一次」的請求。上次給這位學生的版本如下：
+
+\`\`\`
+${opts.previousMarkdown.slice(0, 2500)}
+\`\`\`
+
+${directive}`;
+}
+
 export function buildQuizPrompt(opts: {
   profile: Profile;
   lessonMarkdown: string;

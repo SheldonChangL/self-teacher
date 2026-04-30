@@ -29,6 +29,7 @@ export default async function LessonPage({
       sessionId={sid}
       initialText={initialText}
       initialDone={initialDone}
+      initialFeedback={session.feedback}
     />
   );
 }
