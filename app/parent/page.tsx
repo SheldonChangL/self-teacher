@@ -4,7 +4,10 @@ import { BackLink } from "@/components/BackLink";
 import { ProfileSettingsModal } from "@/components/ProfileSettingsModal";
 import { ParentLogoutButton } from "@/components/ParentLogoutButton";
 import { CostHero } from "@/components/CostHero";
+import { AIPicker } from "@/components/AIPicker";
 import { getCostStats } from "@/lib/limits";
+import { getActiveProvider, getActiveModel } from "@/lib/ai-router";
+import { getSetting } from "@/lib/db";
 import { SUBJECTS } from "@/lib/subjects";
 import {
   ActivityBarChart,
@@ -31,6 +34,11 @@ export default function ParentDashboard() {
 
   const hasSubjectData = stats.totals.lessons > 0;
   const cost = getCostStats();
+  const aiProvider = getActiveProvider();
+  const aiModelClaude =
+    getSetting("ai_model_claude") ?? getActiveModel("claude");
+  const aiModelGemini =
+    getSetting("ai_model_gemini") ?? getActiveModel("gemini");
 
   return (
     <main className="flex flex-1 flex-col items-center px-6 py-10">
@@ -68,11 +76,16 @@ export default function ParentDashboard() {
           />
         </div>
 
-        <div className="mt-4">
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
           <CostHero
             monthUsd={cost.month_usd}
             budgetUsd={cost.budget_usd}
             dailyLimit={cost.daily_limit}
+          />
+          <AIPicker
+            initialProvider={aiProvider}
+            initialModelClaude={aiModelClaude}
+            initialModelGemini={aiModelGemini}
           />
         </div>
 

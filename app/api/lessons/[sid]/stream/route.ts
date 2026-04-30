@@ -1,5 +1,5 @@
 import { db, Profile, Session } from "@/lib/db";
-import { streamClaude } from "@/lib/claude";
+import { streamAI, getActiveProvider } from "@/lib/ai-router";
 import { buildLessonPrompt, buildRegeneratePrompt } from "@/lib/prompts";
 import { startQuizGeneration } from "@/lib/quiz-runner";
 import { bumpDailyActivity } from "@/lib/streak";
@@ -103,7 +103,7 @@ export async function GET(
       // initial heartbeat so client gets headers immediately
       send({ ready: true });
       try {
-        for await (const evt of streamClaude(prompt, {
+        for await (const evt of streamAI(prompt, {
           allowedTools: ["Read"],
           signal: ac.signal,
         })) {
@@ -129,12 +129,13 @@ export async function GET(
         bumpDailyActivity(session.profile_id);
         addCardsForLesson(session.profile_id, sid, full);
 
-        if (costUsd > 0) {
-          db.prepare(
-            `INSERT INTO cost_log (profile_id, kind, cost_usd, created_at)
-             VALUES (?, 'lesson', ?, ?)`,
-          ).run(session.profile_id, costUsd, Date.now());
-        }
+        // Always log so the parent can see usage even when cost is unknown
+        // (e.g. Gemini emits costUsd=0). Tag with active provider in `kind`.
+        const kind = `lesson:${getActiveProvider()}`;
+        db.prepare(
+          `INSERT INTO cost_log (profile_id, kind, cost_usd, created_at)
+           VALUES (?, ?, ?, ?)`,
+        ).run(session.profile_id, kind, costUsd, Date.now());
 
         // fire-and-forget: start quiz generation while kid reads
         startQuizGeneration(sid);

@@ -1,5 +1,5 @@
 import { db, Profile, Session } from "./db";
-import { runClaude } from "./claude";
+import { runAI } from "./ai-router";
 import { buildQuizPrompt } from "./prompts";
 
 const inFlight = new Set<string>();
@@ -54,7 +54,9 @@ export function startQuizGeneration(sessionId: string): void {
         lessonMarkdown: lesson.markdown,
         subject: session.subject,
       });
-      const { text, costUsd } = await runClaude(prompt, { allowedTools: [] });
+      const { text, costUsd, provider } = await runAI(prompt, {
+        allowedTools: [],
+      });
       const quiz = extractJson(text) as Quiz;
 
       if (!quiz.questions || !Array.isArray(quiz.questions)) {
@@ -65,12 +67,10 @@ export function startQuizGeneration(sessionId: string): void {
         "UPDATE sessions SET quiz_json = ?, quiz_status = 'done' WHERE id = ?",
       ).run(JSON.stringify(quiz), sessionId);
 
-      if (costUsd > 0) {
-        db.prepare(
-          `INSERT INTO cost_log (profile_id, kind, cost_usd, created_at)
-           VALUES (?, 'quiz', ?, ?)`,
-        ).run(session.profile_id, costUsd, Date.now());
-      }
+      db.prepare(
+        `INSERT INTO cost_log (profile_id, kind, cost_usd, created_at)
+         VALUES (?, ?, ?, ?)`,
+      ).run(session.profile_id, `quiz:${provider}`, costUsd, Date.now());
     } catch (err) {
       console.error("[quiz]", sessionId, err);
       db.prepare("UPDATE sessions SET quiz_status = 'error' WHERE id = ?").run(
