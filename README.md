@@ -30,21 +30,30 @@
 ## 🚀 快速開始
 
 ### 需求
-- Node.js **18+**（建議 22）
+- Node.js **18.17+**（建議 22；專案附 `.nvmrc`）
 - [Claude Code CLI](https://docs.claude.com/en/docs/claude-code) 已安裝且已登入（`claude --version` 能跑）
 
 ### 安裝
 ```bash
 git clone https://github.com/SheldonChangL/self-teacher.git
 cd self-teacher
+nvm use            # 自動讀 .nvmrc 切到 Node 22
 npm install
 ```
 
 ### 跑起來
 ```bash
+nvm use            # 每次新 shell 都先這個
 npm run dev
 ```
 打開 `http://localhost:3000`（或同 LAN 的 `http://<電腦的-IP>:3000`）即可。
+
+> 🚨 **如果看到 `SyntaxError: Unexpected token ?`** 八成是跑到舊版 Node。
+> 確認 `node --version` 顯示 v18.17 以上；不行的話直接：
+> ```bash
+> export PATH="$HOME/.nvm/versions/node/v22.3.0/bin:$PATH"
+> npm run dev
+> ```
 
 第一次進去會看到空白頭像列表，點「➕ 新增小朋友」建立 profile。
 
