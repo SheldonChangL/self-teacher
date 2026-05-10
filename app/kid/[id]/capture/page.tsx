@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, use } from "react";
+import { useEffect, useRef, useState, use } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Webcam from "react-webcam";
 import { SUBJECTS, type Subject } from "@/lib/subjects";
@@ -27,10 +27,23 @@ export default function CapturePage({
   const [snaps, setSnaps] = useState<Snap[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [mode, setMode] = useState<"camera" | "upload">("camera");
+  const [mode, setMode] = useState<"camera" | "upload">("upload");
+  const [canUseCamera, setCanUseCamera] = useState(false);
   const [subject, setSubject] = useState<Subject>("free");
   const [hint, setHint] = useState("");
   const [phoneSent, setPhoneSent] = useState(false);
+
+  useEffect(() => {
+    const ok =
+      typeof window !== "undefined" &&
+      window.isSecureContext &&
+      typeof navigator !== "undefined" &&
+      !!navigator.mediaDevices?.getUserMedia;
+    if (ok) {
+      setCanUseCamera(true);
+      setMode("camera");
+    }
+  }, []);
 
   async function takePhoto() {
     const cam = webcamRef.current;
@@ -44,20 +57,29 @@ export default function CapturePage({
     setSnaps((s) => [...s, { dataUrl, blob }]);
   }
 
-  async function onPickFiles(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []);
-    const next: Snap[] = [];
-    for (const f of files) {
-      const dataUrl = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.readAsDataURL(f);
-      });
-      next.push({ dataUrl, blob: f });
-    }
-    setSnaps((s) => [...s, ...next]);
-    if (fileRef.current) fileRef.current.value = "";
-  }
+  // Bind a NATIVE change listener (not React's onChange) — iOS Safari sometimes
+  // drops React's synthetic event when returning from the camera UI.
+  useEffect(() => {
+    const input = fileRef.current;
+    if (!input) return;
+    const handler = async () => {
+      const files = Array.from(input.files ?? []);
+      if (!files.length) return;
+      const next: Snap[] = [];
+      for (const f of files) {
+        const dataUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.readAsDataURL(f);
+        });
+        next.push({ dataUrl, blob: f });
+      }
+      setSnaps((s) => [...s, ...next]);
+      input.value = "";
+    };
+    input.addEventListener("change", handler);
+    return () => input.removeEventListener("change", handler);
+  }, [mode, canUseCamera]);
 
   function remove(i: number) {
     setSnaps((s) => s.filter((_, idx) => idx !== i));
@@ -146,45 +168,52 @@ export default function CapturePage({
             {SUBJECTS.map((s) => (
               <button
                 key={s.id}
+                type="button"
                 onClick={() => setSubject(s.id)}
-                className={`flex flex-col items-center rounded-2xl px-2 py-3 transition ${
+                className={`flex touch-manipulation flex-col items-center rounded-2xl px-2 py-3 transition ${
                   subject === s.id
-                    ? "bg-amber-500 text-white shadow-md ring-2 ring-amber-600"
-                    : "bg-white/80 text-zinc-700 ring-1 ring-amber-100 hover:bg-amber-50"
+                    ? "scale-105 bg-amber-500 text-white shadow-xl ring-4 ring-amber-600"
+                    : "bg-white text-zinc-700 ring-2 ring-amber-200 hover:bg-amber-50 hover:ring-amber-400"
                 }`}
               >
-                <span className="text-2xl">{s.icon}</span>
-                <span className="mt-1 text-xs font-bold">{s.label}</span>
+                <span className="text-3xl">{s.icon}</span>
+                <span className="mt-1 text-sm font-extrabold">
+                  {s.label}
+                </span>
               </button>
             ))}
           </div>
         </div>
 
-        <div className="mt-4 flex gap-2">
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          {canUseCamera && (
+            <button
+              type="button"
+              onClick={() => setMode("camera")}
+              className={`touch-manipulation rounded-full px-4 py-2 text-sm font-medium ${
+                mode === "camera"
+                  ? "bg-amber-500 text-white"
+                  : "bg-zinc-100 text-zinc-700"
+              }`}
+            >
+              📷 即時相機
+            </button>
+          )}
           <button
-            onClick={() => setMode("camera")}
-            className={`rounded-full px-4 py-2 text-sm font-medium ${
-              mode === "camera"
-                ? "bg-amber-500 text-white"
-                : "bg-zinc-100 text-zinc-700"
-            }`}
-          >
-            用相機
-          </button>
-          <button
+            type="button"
             onClick={() => setMode("upload")}
-            className={`rounded-full px-4 py-2 text-sm font-medium ${
+            className={`touch-manipulation rounded-full px-4 py-2 text-sm font-medium ${
               mode === "upload"
                 ? "bg-amber-500 text-white"
                 : "bg-zinc-100 text-zinc-700"
             }`}
           >
-            選檔案
+            📁 選檔案／拍照
           </button>
         </div>
 
         <div className="mt-4 overflow-hidden rounded-3xl bg-black/90 ring-2 ring-amber-200">
-          {mode === "camera" ? (
+          {mode === "camera" && canUseCamera ? (
             <Webcam
               ref={webcamRef}
               audio={false}
@@ -192,7 +221,7 @@ export default function CapturePage({
               videoConstraints={{ facingMode: "environment" }}
               className="aspect-video w-full object-cover"
               onUserMediaError={() =>
-                setErr("無法使用相機，請改用「選檔案」")
+                setErr("無法使用相機，請改用「選檔案／拍照」")
               }
             />
           ) : (
@@ -202,17 +231,17 @@ export default function CapturePage({
                 type="file"
                 accept="image/*"
                 multiple
-                onChange={onPickFiles}
-                className="block w-full text-center text-zinc-700 file:mr-4 file:rounded-full file:border-0 file:bg-amber-500 file:px-6 file:py-3 file:text-white"
+                className="block w-full text-center text-zinc-700 file:mr-4 file:rounded-full file:border-0 file:bg-amber-500 file:px-6 file:py-3 file:text-base file:font-bold file:text-white"
               />
             </div>
           )}
         </div>
 
-        {mode === "camera" && (
+        {mode === "camera" && canUseCamera && (
           <button
+            type="button"
             onClick={takePhoto}
-            className="mt-4 w-full rounded-2xl bg-amber-500 py-4 text-xl font-bold text-white shadow-md transition hover:bg-amber-600"
+            className="mt-4 w-full touch-manipulation rounded-2xl bg-amber-500 py-4 text-xl font-bold text-white shadow-md transition hover:bg-amber-600"
           >
             📸 拍一張
           </button>
