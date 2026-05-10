@@ -20,7 +20,7 @@
 | 層 | 用什麼 | 為什麼 |
 |---|---|---|
 | 前後端 | Next.js 15 (App Router) + TypeScript | 全端整合，API routes 直接 spawn claude |
-| 樣式 | Tailwind CSS v4 | 兒童友善的大按鈕配色 |
+| 樣式 | Tailwind CSS v3 | 兒童友善的大按鈕配色；v3 產出 `rgba()` 而非 `oklch()`，相容 LG TV WebOS 等舊瀏覽器 |
 | DB | better-sqlite3 (本機檔案) | 零設定、零維運 |
 | AI | `claude` CLI subprocess (`--output-format=stream-json --include-partial-messages`) | 直接重用使用者已登入的 CLI，不用管 API key |
 | 多裝置同步 | Node `EventEmitter` + SSE | 同一個 process 內 publish/subscribe，無需 redis |
@@ -46,7 +46,7 @@ npm install
 nvm use            # 每次新 shell 都先這個
 npm run dev
 ```
-打開 `http://localhost:3000`（或同 LAN 的 `http://<電腦的-IP>:3000`）即可。
+打開 `http://localhost:3030`（或同 LAN 的 `http://<電腦的-IP>:3030`）即可。
 
 > 🚨 **如果看到 `SyntaxError: Unexpected token ?`** 八成是跑到舊版 Node。
 > 確認 `node --version` 顯示 v18.17 以上；不行的話直接：
@@ -58,12 +58,16 @@ npm run dev
 第一次進去會看到空白頭像列表，點「➕ 新增小朋友」建立 profile。
 
 ### 電視 + 手機模式
-1. 電視瀏覽器開 `http://<電腦的-LAN-IP>:3000` → 選小朋友
+1. 電視瀏覽器開 `http://<電腦的-LAN-IP>:3030` → 選小朋友
 2. 電視會顯示一個大 QR Code
 3. 手機（同 Wi-Fi）相機掃 QR Code
 4. 手機開啟拍照頁 → 選科目（國語 / 英文 / 數學 / 自然 / 社會 / 自由探索）→ 拍照 → 送出
 5. 手機顯示「📺 送出囉！快回去看電視」
 6. 電視自動跳到課文頁，邊串流邊播語音
+
+> 📱 **iPhone 走 LAN HTTP 注意事項**：iOS Safari 規定 `getUserMedia`（瀏覽器內相機預覽）只能在 HTTPS 或 localhost 使用。
+> 走 `http://<LAN-IP>:3030` 時 capture 頁會自動切到「選檔案」模式，按下會開啟 iOS 原生相機選擇器，
+> 一樣能拍照／從相簿選照片。若要使用瀏覽器內預覽，請改走 HTTPS（自簽憑證、Tailscale Funnel、ngrok 等）。
 
 ## ⚙️ 環境變數
 

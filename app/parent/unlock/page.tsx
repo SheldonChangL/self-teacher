@@ -1,169 +1,109 @@
-"use client";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { getSetting, setSetting } from "@/lib/db";
+import {
+  COOKIE_NAME,
+  KEYS,
+  hashPin,
+  signSession,
+  verifyPin,
+} from "@/lib/parent-auth";
 
-import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+const DEFAULT_SECRET =
+  process.env.PARENT_AUTH_SECRET ?? "self-teacher-dev-secret-please-override";
 
-export default function UnlockPage() {
-  const router = useRouter();
-  const params = useSearchParams();
-  const next = params.get("next") || "/parent";
-  const [hasPin, setHasPin] = useState<boolean | null>(null);
-  const [pin, setPin] = useState("");
-  const [confirmPin, setConfirmPin] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+async function unlockAction(formData: FormData) {
+  "use server";
+  const pin = String(formData.get("pin") ?? "");
+  const rawNext = String(formData.get("next") ?? "/parent");
+  const next = rawNext.startsWith("/") ? rawNext : "/parent";
 
-  useEffect(() => {
-    fetch("/api/parent/auth")
-      .then((r) => r.json())
-      .then((j) => setHasPin(!!j.has_pin))
-      .catch(() => setHasPin(false));
-  }, []);
+  const back = (err: string) =>
+    `/parent/unlock?next=${encodeURIComponent(next)}&err=${err}`;
 
-  function tap(d: string) {
-    if (busy) return;
-    setErr(null);
-    if (pin.length >= 8) return;
-    setPin((p) => p + d);
+  if (!/^\d{4,8}$/.test(pin)) {
+    redirect(back("format"));
   }
 
-  function back() {
-    setPin((p) => p.slice(0, -1));
-    setErr(null);
-  }
-
-  async function submit() {
-    if (pin.length < 4) {
-      setErr("至少 4 位數");
-      return;
+  const stored = getSetting(KEYS.pinHash);
+  if (stored) {
+    if (!(await verifyPin(pin, stored))) {
+      redirect(back("wrong"));
     }
-    if (hasPin === false) {
-      // Set flow: ask for confirmation pin
-      if (confirmPin === null) {
-        setConfirmPin(pin);
-        setPin("");
-        return;
-      }
-      if (pin !== confirmPin) {
-        setErr("兩次 PIN 不一樣，請重來");
-        setPin("");
-        setConfirmPin(null);
-        return;
-      }
-      setBusy(true);
-      const res = await fetch("/api/parent/auth", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "set", pin }),
-      });
-      setBusy(false);
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        setErr(j.error ?? "設定失敗");
-        return;
-      }
-      router.push(next);
-      return;
-    }
-
-    setBusy(true);
-    const res = await fetch("/api/parent/auth", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ action: "verify", pin }),
-    });
-    setBusy(false);
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      setErr(j.error ?? "PIN 錯誤");
-      setPin("");
-      return;
-    }
-    router.push(next);
+  } else {
+    setSetting(KEYS.pinHash, await hashPin(pin));
   }
 
-  if (hasPin === null) {
-    return (
-      <main className="flex flex-1 flex-col items-center justify-center px-6">
-        <p className="text-zinc-500">載入中…</p>
-      </main>
-    );
-  }
+  const cookie = await signSession(DEFAULT_SECRET);
+  const jar = await cookies();
+  jar.set(COOKIE_NAME, cookie, {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 8,
+  });
+  redirect(next);
+}
 
-  const phase =
-    hasPin === false
-      ? confirmPin === null
-        ? "set"
-        : "set-confirm"
-      : "verify";
-  const headline =
-    phase === "set"
-      ? "設定家長 PIN（4–8 位）"
-      : phase === "set-confirm"
-        ? "再輸入一次確認"
-        : "輸入家長 PIN";
+export default async function UnlockPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string; err?: string }>;
+}) {
+  const sp = await searchParams;
+  const next = sp.next && sp.next.startsWith("/") ? sp.next : "/parent";
+  const stored = getSetting(KEYS.pinHash);
+  const hasPin = !!stored;
+
+  const headline = hasPin ? "輸入家長 PIN" : "設定家長 PIN（4–8 位數）";
+  const sub = hasPin
+    ? "解鎖後可進家長後台與管理功能"
+    : "之後進入家長後台或刪除資料都需要這組 PIN。請務必記住。";
+
+  let errMsg = "";
+  if (sp.err === "format") errMsg = "PIN 必須是 4-8 位數字";
+  else if (sp.err === "wrong") errMsg = "PIN 錯誤，請再試一次";
 
   return (
     <main className="flex flex-1 flex-col items-center justify-center px-6 py-10">
-      <div className="w-full max-w-sm rounded-3xl bg-white/95 p-7 shadow-xl ring-1 ring-amber-100">
+      <form
+        action={unlockAction}
+        className="w-full max-w-sm rounded-3xl bg-white/95 p-7 shadow-xl ring-1 ring-amber-100"
+      >
+        <input type="hidden" name="next" value={next} />
         <div className="text-center text-5xl">🔒</div>
         <h1 className="mt-3 text-center text-2xl font-extrabold text-amber-700">
           {headline}
         </h1>
-        <p className="mt-1 text-center text-sm text-zinc-500">
-          {phase === "set"
-            ? "之後進入家長後台或刪除資料都需要這組 PIN"
-            : phase === "set-confirm"
-              ? "請再輸入一次"
-              : "解鎖後可進家長後台與管理功能"}
-        </p>
+        <p className="mt-1 text-center text-sm text-zinc-500">{sub}</p>
 
-        <div className="mt-6 flex justify-center gap-2">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <span
-              key={i}
-              className={`h-4 w-4 rounded-full ${
-                i < pin.length ? "bg-amber-500" : "bg-zinc-200"
-              }`}
-            />
-          ))}
-        </div>
+        <input
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]{4,8}"
+          name="pin"
+          required
+          autoFocus
+          maxLength={8}
+          minLength={4}
+          autoComplete="off"
+          className="mt-6 w-full rounded-2xl border-2 border-amber-200 bg-amber-50 px-5 py-4 text-center text-3xl font-bold tracking-[0.4em] text-amber-700 outline-none focus:border-amber-500"
+          placeholder="••••"
+        />
 
-        <div className="mt-6 grid grid-cols-3 gap-3">
-          {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => (
-            <button
-              key={d}
-              onClick={() => tap(d)}
-              className="h-14 rounded-2xl bg-zinc-100 text-2xl font-bold text-zinc-800 hover:bg-amber-100 active:scale-95"
-            >
-              {d}
-            </button>
-          ))}
-          <button
-            onClick={back}
-            className="h-14 rounded-2xl bg-zinc-100 text-base font-bold text-zinc-500 hover:bg-rose-100 active:scale-95"
-          >
-            ⌫
-          </button>
-          <button
-            onClick={() => tap("0")}
-            className="h-14 rounded-2xl bg-zinc-100 text-2xl font-bold text-zinc-800 hover:bg-amber-100 active:scale-95"
-          >
-            0
-          </button>
-          <button
-            onClick={submit}
-            disabled={busy || pin.length < 4}
-            className="h-14 rounded-2xl bg-amber-500 text-base font-bold text-white shadow hover:bg-amber-600 disabled:opacity-50 active:scale-95"
-          >
-            {busy ? "…" : "OK"}
-          </button>
-        </div>
+        <button
+          type="submit"
+          className="mt-4 w-full touch-manipulation rounded-2xl bg-amber-500 py-4 text-xl font-extrabold text-white shadow transition hover:bg-amber-600 active:scale-95"
+        >
+          {hasPin ? "解鎖" : "設定 PIN"}
+        </button>
 
-        {err && (
-          <p className="mt-3 text-center text-sm text-rose-600">{err}</p>
+        {errMsg && (
+          <p className="mt-3 text-center text-sm font-bold text-rose-600">
+            {errMsg}
+          </p>
         )}
-      </div>
+      </form>
     </main>
   );
 }
