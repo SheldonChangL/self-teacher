@@ -1,3 +1,4 @@
+import os from "node:os";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
@@ -14,11 +15,49 @@ const SUBJECT_BY_ID = Object.fromEntries(SUBJECTS.map((s) => [s.id, s]));
 
 export const dynamic = "force-dynamic";
 
+// Skip virtual interfaces (Docker bridges, VPNs, VM hypervisors) — phones on the
+// same Wi-Fi cannot reach those subnets. Prefer the WAN-facing physical NIC.
+const VIRTUAL_IFACE_RE = /^(docker|br-|veth|vmnet|vboxnet|utun|tailscale|zt|tun|tap|llw|awdl)/i;
+
+function findLanIPv4(): string | null {
+  const ifaces = os.networkInterfaces();
+  const candidates: { name: string; addr: string }[] = [];
+  for (const name of Object.keys(ifaces)) {
+    if (VIRTUAL_IFACE_RE.test(name)) continue;
+    for (const info of ifaces[name] ?? []) {
+      if (info.family !== "IPv4" || info.internal) continue;
+      candidates.push({ name, addr: info.address });
+    }
+  }
+  // Prefer en0/en1/eth0/wlan0 (typical Wi-Fi/Ethernet) over anything else.
+  const preferred = candidates.find((c) =>
+    /^(en\d+|eth\d+|wlan\d+|wlp|enp)/i.test(c.name),
+  );
+  return (preferred ?? candidates[0])?.addr ?? null;
+}
+
+function isLoopbackHost(host: string): boolean {
+  const hostname = host.split(":")[0].toLowerCase();
+  return (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "::1" ||
+    hostname === "0.0.0.0"
+  );
+}
+
 async function buildCaptureUrl(profileId: string): Promise<string> {
   const h = await headers();
-  const host = h.get("host") ?? "localhost:3000";
-  const proto =
-    h.get("x-forwarded-proto") ?? (host.includes("localhost") ? "http" : "http");
+  const rawHost = h.get("host") ?? "localhost:3030";
+  let host = rawHost;
+  if (isLoopbackHost(rawHost)) {
+    const lan = findLanIPv4();
+    if (lan) {
+      const port = rawHost.includes(":") ? rawHost.split(":")[1] : "3030";
+      host = `${lan}:${port}`;
+    }
+  }
+  const proto = h.get("x-forwarded-proto") ?? "http";
   return `${proto}://${host}/kid/${profileId}/capture?from=phone`;
 }
 
