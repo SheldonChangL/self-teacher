@@ -1,4 +1,5 @@
 import type { Profile, Subject } from "./db";
+import type { PhonicsLessonDef, PhonicsStageDef } from "./phonics-curriculum";
 
 function difficultyHint(age: number) {
   if (age <= 5)
@@ -201,6 +202,71 @@ ${opts.previousMarkdown.slice(0, 2500)}
 \`\`\`
 
 ${directive}`;
+}
+
+/** Build a Gemini prompt that returns engaging phonics lesson content as
+ *  strict JSON. Run once per lesson by scripts/seed-phonics.mjs and cached
+ *  into the phonics_lessons table. */
+export function buildPhonicsLessonPrompt(opts: {
+  stage: PhonicsStageDef;
+  lesson: PhonicsLessonDef;
+}): string {
+  const { stage, lesson } = opts;
+  const graphemeList = lesson.graphemes.map((g) => `"${g}"`).join(", ");
+
+  return `你是英國國小一年級的英文老師，正在用「自然發音 (Phonics)」教 6 歲的台灣小朋友。
+我們現在在「${stage.title}」階段，這一課的主題是「${lesson.title}」。
+這一課要教的字母 / 字母組合：[${graphemeList}]
+重點：${lesson.focus}
+
+請替這一課產生一份生動、可愛、適合 6 歲小孩的教材。
+
+【非常重要的發音規則】
+- 所有 IPA 音標一律用「英式」發音 (Received Pronunciation)，不要用美式
+- 例：bath /bɑːθ/（不是 /bæθ/）、car /kɑː/（不是 /kɑːr/）、water /ˈwɔːtə/（不是 /ˈwɔːtər/）
+- r 在母音後通常**不發音**：car /kɑː/、bird /bɜːd/、her /hɜː/
+- 短 o 用 /ɒ/：hot /hɒt/、dog /dɒɡ/
+
+【內容要求】
+- intro_zh：用一兩句話可愛地介紹今天要學什麼聲音
+- mnemonic_zh：給一個好記的肢體動作或畫面比喻
+- 對 graphemes 陣列裡的**每一個**字母組合（共 ${lesson.graphemes.length} 個），都要單獨一筆，包含：
+  - grapheme：字母組合本身
+  - phoneme_ipa：英式 IPA 音標（用 / / 包起來）
+  - how_to_say_zh：嘴型 / 舌頭位置，用小朋友聽得懂的中文
+  - example_words：4-6 個 6 歲日常生活看得到的單字，每個含 word / ipa (英式) / meaning_zh / emoji
+- story_en：一個 20-30 字的英文短故事，**密集地**用到今天教的音；句子要簡單到 6 歲念得出來
+- story_zh：上面故事的中文翻譯
+- practice_sentences：3 句練習句，每句 en + zh 對照，句子要短
+- mini_quiz：3 題單選練習，每題：question_zh（用中文問）、choices（4 個英文字或選項）、answer_index（0-3）
+- fun_fact_zh：一條跟今天的音相關的有趣小知識
+
+【中文用字】${TC_REMINDER}
+
+【輸出規定】
+**只輸出 JSON 物件，沒有任何前後文字、沒有 \`\`\` 包裝**。schema 如下：
+
+{
+  "intro_zh": "string",
+  "mnemonic_zh": "string",
+  "graphemes": [
+    {
+      "grapheme": "string",
+      "phoneme_ipa": "string",
+      "how_to_say_zh": "string",
+      "example_words": [
+        { "word": "string", "ipa": "string", "meaning_zh": "string", "emoji": "string" }
+      ]
+    }
+  ],
+  "story_en": "string",
+  "story_zh": "string",
+  "practice_sentences": [ { "en": "string", "zh": "string" } ],
+  "mini_quiz": [
+    { "question_zh": "string", "choices": ["string","string","string","string"], "answer_index": 0 }
+  ],
+  "fun_fact_zh": "string"
+}`;
 }
 
 export function buildQuizPrompt(opts: {

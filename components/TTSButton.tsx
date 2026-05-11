@@ -1,19 +1,21 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { pickGBVoice } from "./tts-voices";
 
-const CJK = /[㐀-鿿豈-﫿　-〿＀-￯]/;
+const CJK = /[㐀-鿿豈-﫿　-〿＀-￯]/;
 
 function chunkByLang(text: string): { text: string; lang: string }[] {
   // Split into sentences and group by detected language to avoid switching
-  // voices mid-word.
+  // voices mid-word. Non-CJK chunks all get en-GB so the kid hears British
+  // pronunciation throughout the app (lessons, phonics, quiz).
   const sentences = text
     .split(/(?<=[。！？!?\n])\s+|\n+/)
     .map((s) => s.trim())
     .filter(Boolean);
   const out: { text: string; lang: string }[] = [];
   for (const s of sentences) {
-    const lang = CJK.test(s) ? "zh-TW" : "en-US";
+    const lang = CJK.test(s) ? "zh-TW" : "en-GB";
     const last = out[out.length - 1];
     if (last && last.lang === lang) last.text += " " + s;
     else out.push({ text: s, lang });
@@ -28,6 +30,11 @@ export function TTSButton({ text }: { text: string }) {
 
   useEffect(() => {
     setSupported(typeof window !== "undefined" && "speechSynthesis" in window);
+    // Trigger an initial getVoices() so the browser starts populating the list
+    // (Chrome lazy-loads voices on first read).
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.getVoices();
+    }
     return () => {
       if (typeof window !== "undefined" && "speechSynthesis" in window)
         window.speechSynthesis.cancel();
@@ -43,11 +50,13 @@ export function TTSButton({ text }: { text: string }) {
       .replace(/\s+/g, " ")
       .trim();
     const chunks = chunkByLang(stripped);
+    const gbVoice = pickGBVoice();
     const queue = chunks.map((c) => {
       const u = new SpeechSynthesisUtterance(c.text);
       u.lang = c.lang;
       u.rate = 0.95;
       u.pitch = 1.05;
+      if (c.lang === "en-GB" && gbVoice) u.voice = gbVoice;
       return u;
     });
     queueRef.current = queue;

@@ -114,6 +114,31 @@ function open() {
       created_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_usage_kid_date ON game_time_usage(profile_id, date);
+
+    -- Phonics: AI-generated lesson content keyed by (stage, lesson) slugs from
+    -- lib/phonics-curriculum.ts. Populated once via scripts/seed-phonics.mjs;
+    -- the runtime reads from here and never calls AI.
+    CREATE TABLE IF NOT EXISTS phonics_lessons (
+      stage_slug   TEXT NOT NULL,
+      lesson_slug  TEXT NOT NULL,
+      content_json TEXT NOT NULL,
+      generated_at INTEGER NOT NULL,
+      provider     TEXT,
+      cost_usd     REAL NOT NULL DEFAULT 0,
+      PRIMARY KEY (stage_slug, lesson_slug)
+    );
+
+    -- Phonics: per-kid completion log. "Completed" just means the kid pressed
+    -- the "我學會了" button on that lesson at least once.
+    CREATE TABLE IF NOT EXISTS phonics_progress (
+      profile_id   TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+      stage_slug   TEXT NOT NULL,
+      lesson_slug  TEXT NOT NULL,
+      completed_at INTEGER NOT NULL,
+      PRIMARY KEY (profile_id, stage_slug, lesson_slug)
+    );
+    CREATE INDEX IF NOT EXISTS idx_phonics_progress_profile
+      ON phonics_progress(profile_id);
   `);
 
   // Backfill columns if migrating from an older schema.
@@ -247,6 +272,22 @@ export type DailyLog = {
   status: DailyLogStatus;
   minutes_awarded: number;
   created_at: number;
+};
+
+export type PhonicsLessonRow = {
+  stage_slug: string;
+  lesson_slug: string;
+  content_json: string;
+  generated_at: number;
+  provider: string | null;
+  cost_usd: number;
+};
+
+export type PhonicsProgressRow = {
+  profile_id: string;
+  stage_slug: string;
+  lesson_slug: string;
+  completed_at: number;
 };
 
 export type Session = {
