@@ -168,6 +168,13 @@ export default async function KidHome({
               </Link>
             )}
 
+            <Link
+              href={`/kid/${id}/phonics`}
+              className="flex items-center justify-center gap-3 rounded-3xl bg-gradient-to-r from-sky-400 to-indigo-400 px-6 py-5 text-xl font-bold text-white shadow-lg transition hover:scale-[1.02]"
+            >
+              🔤 自然發音 Phonics
+            </Link>
+
             <h2 className="mt-2 text-xl font-semibold text-zinc-700">
               以前學過的 📚
             </h2>
