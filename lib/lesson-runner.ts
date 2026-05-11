@@ -1,3 +1,4 @@
+import { EventEmitter } from "node:events";
 import { db, Profile, Session } from "./db";
 import { streamAI, getActiveProvider } from "./ai-router";
 import { buildLessonPrompt, buildRegeneratePrompt } from "./prompts";
@@ -10,6 +11,44 @@ import { startQuizGeneration } from "./quiz-runner";
 // route all try to kick it off simultaneously.
 const inFlight = new Set<string>();
 
+// Live broadcast channel per session. The runner emits "msg" events while
+// claude streams in; the lesson stream route subscribes so multiple viewers
+// (and refreshes) see the same single claude run instead of triggering more.
+export type LessonMsg =
+  | { type: "delta"; text: string }
+  | { type: "done"; title: string }
+  | { type: "error"; message: string };
+
+export type LessonChannel = {
+  emitter: EventEmitter;
+  /** Everything claude has emitted so far — replayed to late subscribers. */
+  buffer: string;
+  /** True once the runner reached a terminal state (done or error). */
+  ended: boolean;
+  /** Set when `ended` is true so late subscribers can immediately finalize. */
+  finalMsg?: LessonMsg;
+};
+
+const channels = new Map<string, LessonChannel>();
+
+function getOrCreateChannel(sid: string): LessonChannel {
+  let ch = channels.get(sid);
+  if (!ch) {
+    const emitter = new EventEmitter();
+    // Several refresh-happy clients (TV + phone + desktop) might subscribe
+    // at the same time. Bump the warning threshold from the default 10.
+    emitter.setMaxListeners(50);
+    ch = { emitter, buffer: "", ended: false };
+    channels.set(sid, ch);
+  }
+  return ch;
+}
+
+/** Subscribers can read the buffered transcript + listen to live events. */
+export function getLessonChannel(sid: string): LessonChannel | undefined {
+  return channels.get(sid);
+}
+
 function extractTitle(md: string): string {
   const m = md.match(/^#\s+(.+)$/m);
   return m ? m[1].trim() : "今天的學習";
@@ -18,17 +57,21 @@ function extractTitle(md: string): string {
 /**
  * Fire-and-forget lesson generation.
  *
- * Idempotent: returns immediately if the session is already done, already
- * running in this process, or not found. Otherwise marks the row as `running`
- * and spawns the AI in the background; status flips to `done` (with
- * `lesson_json`) or `error` when finished.
+ * Idempotent: returns immediately if the session is already done or already
+ * running in this process. Otherwise marks the row as `running` and spawns
+ * the AI in the background; status flips to `done` (with `lesson_json`) or
+ * `error` when finished.
  *
  * Called from:
- *   - `/api/upload`            — kick off as soon as the photo lands
- *   - `app/kid/[id]/page.tsx`  — recover pending sessions on render so the
- *                                TV-side EventSource isn't a single point of
- *                                failure (old WebOS Chromium can't run the
- *                                client bundle)
+ *   - `/api/upload`             — kick off as soon as the photo lands
+ *   - `app/kid/[id]/page.tsx`   — recover pending sessions on render so the
+ *                                 TV-side EventSource isn't a single point of
+ *                                 failure (old WebOS Chromium can't run the
+ *                                 client bundle)
+ *   - `/api/lessons/[sid]/stream` — when the modern phone/desktop client
+ *                                 opens the SSE; it then subscribes to the
+ *                                 same channel instead of spawning its own
+ *                                 claude.
  */
 export function startLessonGeneration(sessionId: string): void {
   if (inFlight.has(sessionId)) return;
@@ -42,6 +85,16 @@ export function startLessonGeneration(sessionId: string): void {
   // process; fall through and re-run them.
 
   inFlight.add(sessionId);
+  const ch = getOrCreateChannel(sessionId);
+
+  const finalize = (msg: LessonMsg) => {
+    ch.ended = true;
+    ch.finalMsg = msg;
+    ch.emitter.emit("msg", msg);
+    // Keep the channel around briefly so late subscribers can still read
+    // `finalMsg` + `buffer` before it disappears.
+    setTimeout(() => channels.delete(sessionId), 30_000);
+  };
 
   void (async () => {
     try {
@@ -94,9 +147,18 @@ export function startLessonGeneration(sessionId: string): void {
       let full = "";
       let costUsd = 0;
       for await (const evt of streamAI(prompt, { allowedTools: ["Read"] })) {
-        if (evt.type === "text") full += evt.text;
-        else if (evt.type === "cost") costUsd = evt.costUsd;
-        else if (evt.type === "error") throw new Error(evt.message);
+        if (evt.type === "text") {
+          full += evt.text;
+          ch.buffer += evt.text;
+          ch.emitter.emit("msg", {
+            type: "delta",
+            text: evt.text,
+          } satisfies LessonMsg);
+        } else if (evt.type === "cost") {
+          costUsd = evt.costUsd;
+        } else if (evt.type === "error") {
+          throw new Error(evt.message);
+        }
       }
       if (!full.trim()) throw new Error("AI 沒回任何內容");
 
@@ -120,11 +182,14 @@ export function startLessonGeneration(sessionId: string): void {
 
       // Kick off quiz generation in the background once the lesson is done.
       startQuizGeneration(sessionId);
+
+      finalize({ type: "done", title });
     } catch (err) {
       console.error("[lesson-runner]", sessionId, err);
       db.prepare(
         "UPDATE sessions SET lesson_status = 'error' WHERE id = ?",
       ).run(sessionId);
+      finalize({ type: "error", message: String(err) });
     } finally {
       inFlight.delete(sessionId);
     }

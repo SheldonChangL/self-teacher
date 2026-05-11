@@ -1,17 +1,12 @@
-import { db, Profile, Session } from "@/lib/db";
-import { streamAI, getActiveProvider } from "@/lib/ai-router";
-import { buildLessonPrompt, buildRegeneratePrompt } from "@/lib/prompts";
-import { startQuizGeneration } from "@/lib/quiz-runner";
-import { bumpDailyActivity } from "@/lib/streak";
-import { addCardsForLesson } from "@/lib/vocab";
+import { db, Session } from "@/lib/db";
+import {
+  startLessonGeneration,
+  getLessonChannel,
+  type LessonMsg,
+} from "@/lib/lesson-runner";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function extractTitle(md: string): string {
-  const m = md.match(/^#\s+(.+)$/m);
-  return m ? m[1].trim() : "今天的學習";
-}
 
 export async function GET(
   req: Request,
@@ -25,17 +20,21 @@ export async function GET(
     return new Response("session not found", { status: 404 });
   }
 
-  // If already done, replay full content quickly so a refresh works.
+  const enc = new TextEncoder();
+  const sse = (obj: unknown) =>
+    enc.encode(`data: ${JSON.stringify(obj)}\n\n`);
+
+  // Already finished: replay cached content immediately. No claude spawn,
+  // refresh-safe.
   if (session.lesson_status === "done" && session.lesson_json) {
-    const lesson = JSON.parse(session.lesson_json) as { markdown: string };
+    const lesson = JSON.parse(session.lesson_json) as {
+      markdown: string;
+      title?: string;
+    };
     const stream = new ReadableStream({
       start(controller) {
-        controller.enqueue(
-          new TextEncoder().encode(
-            `data: ${JSON.stringify({ delta: lesson.markdown })}\n\n` +
-              `data: ${JSON.stringify({ done: true, cached: true })}\n\n`,
-          ),
-        );
+        controller.enqueue(sse({ delta: lesson.markdown }));
+        controller.enqueue(sse({ done: true, cached: true }));
         controller.close();
       },
     });
@@ -47,111 +46,98 @@ export async function GET(
     });
   }
 
-  const profile = db
-    .prepare("SELECT * FROM profiles WHERE id = ?")
-    .get(session.profile_id) as Profile | undefined;
-  if (!profile) {
-    return new Response("profile not found", { status: 404 });
-  }
-
-  const imagePaths = JSON.parse(session.image_paths) as string[];
-
-  // Strip the [regenerate:mode] tag from hint before passing to prompts
-  const regenMatch = session.hint.match(/^\[regenerate:(simpler|angle)\]\s*(.*)$/);
-  const cleanHint = regenMatch ? regenMatch[2] : session.hint;
-  const regenMode = regenMatch ? (regenMatch[1] as "simpler" | "angle") : null;
-
-  let prompt: string;
-  if (regenMode && session.prev_lesson_id) {
-    const prev = db
-      .prepare("SELECT lesson_json FROM sessions WHERE id = ?")
-      .get(session.prev_lesson_id) as { lesson_json: string | null } | undefined;
-    const prevMd = prev?.lesson_json
-      ? (JSON.parse(prev.lesson_json) as { markdown?: string }).markdown ?? ""
-      : "";
-    prompt = buildRegeneratePrompt({
-      profile,
-      imageRelPaths: imagePaths,
-      subject: session.subject,
-      hint: cleanHint,
-      previousMarkdown: prevMd,
-      mode: regenMode,
-    });
-  } else {
-    prompt = buildLessonPrompt({
-      profile,
-      imageRelPaths: imagePaths,
-      subject: session.subject,
-      hint: cleanHint,
-    });
-  }
-
-  db.prepare("UPDATE sessions SET lesson_status = 'running' WHERE id = ?").run(
-    sid,
-  );
-
-  const enc = new TextEncoder();
-  const ac = new AbortController();
-  req.signal.addEventListener("abort", () => ac.abort());
+  // Otherwise: hand the work to the shared lesson-runner (idempotent — if
+  // /api/upload or kid-home already kicked it off, this is a no-op) and
+  // subscribe to its broadcast channel. Multiple refreshes / multiple
+  // viewers share one claude run.
+  startLessonGeneration(sid);
 
   const stream = new ReadableStream({
-    async start(controller) {
-      let full = "";
-      let costUsd = 0;
-      const send = (obj: unknown) =>
-        controller.enqueue(enc.encode(`data: ${JSON.stringify(obj)}\n\n`));
-      // initial heartbeat so client gets headers immediately
-      send({ ready: true });
-      try {
-        for await (const evt of streamAI(prompt, {
-          allowedTools: ["Read"],
-          signal: ac.signal,
-        })) {
-          if (evt.type === "text") {
-            full += evt.text;
-            send({ delta: evt.text });
-          } else if (evt.type === "cost") {
-            costUsd = evt.costUsd;
-          } else if (evt.type === "error") {
-            send({ error: evt.message });
-            db.prepare(
-              "UPDATE sessions SET lesson_status = 'error' WHERE id = ?",
-            ).run(sid);
-            controller.close();
-            return;
-          }
+    start(controller) {
+      let closed = false;
+      const safeEnqueue = (obj: unknown) => {
+        if (closed) return;
+        try {
+          controller.enqueue(sse(obj));
+        } catch {
+          // controller already closed
         }
-        const title = extractTitle(full);
-        db.prepare(
-          "UPDATE sessions SET lesson_json = ?, lesson_status = 'done' WHERE id = ?",
-        ).run(JSON.stringify({ markdown: full, title }), sid);
+      };
+      const safeClose = () => {
+        if (closed) return;
+        closed = true;
+        try {
+          controller.close();
+        } catch {}
+      };
 
-        bumpDailyActivity(session.profile_id);
-        addCardsForLesson(session.profile_id, sid, full);
+      safeEnqueue({ ready: true });
 
-        // Always log so the parent can see usage even when cost is unknown
-        // (e.g. Gemini emits costUsd=0). Tag with active provider in `kind`.
-        const kind = `lesson:${getActiveProvider()}`;
-        db.prepare(
-          `INSERT INTO cost_log (profile_id, kind, cost_usd, created_at)
-           VALUES (?, ?, ?, ?)`,
-        ).run(session.profile_id, kind, costUsd, Date.now());
-
-        // fire-and-forget: start quiz generation while kid reads
-        startQuizGeneration(sid);
-
-        send({ done: true, title });
-        controller.close();
-      } catch (err) {
-        send({ error: String(err) });
-        db.prepare(
-          "UPDATE sessions SET lesson_status = 'error' WHERE id = ?",
-        ).run(sid);
-        controller.close();
+      const ch = getLessonChannel(sid);
+      if (!ch) {
+        // Race: runner finished + cleaned up its channel before we got here.
+        // Fall back to DB.
+        const s2 = db
+          .prepare("SELECT * FROM sessions WHERE id = ?")
+          .get(sid) as Session | undefined;
+        if (s2?.lesson_status === "done" && s2.lesson_json) {
+          const lesson = JSON.parse(s2.lesson_json) as {
+            markdown: string;
+            title?: string;
+          };
+          safeEnqueue({ delta: lesson.markdown });
+          safeEnqueue({ done: true, title: lesson.title, cached: true });
+        } else if (s2?.lesson_status === "error") {
+          safeEnqueue({ error: "lesson 之前失敗了，請重新整理或重新拍照" });
+        } else {
+          safeEnqueue({
+            error: "找不到 lesson channel，請重新整理",
+          });
+        }
+        safeClose();
+        return;
       }
-    },
-    cancel() {
-      ac.abort();
+
+      // Replay everything claude has produced so far so a late subscriber
+      // (refresh / second tab) catches up.
+      if (ch.buffer) safeEnqueue({ delta: ch.buffer });
+
+      // Already finalized → emit the final frame and close.
+      if (ch.ended && ch.finalMsg) {
+        if (ch.finalMsg.type === "done") {
+          safeEnqueue({ done: true, title: ch.finalMsg.title });
+        } else if (ch.finalMsg.type === "error") {
+          safeEnqueue({ error: ch.finalMsg.message });
+        }
+        safeClose();
+        return;
+      }
+
+      const onMsg = (msg: LessonMsg) => {
+        if (msg.type === "delta") {
+          safeEnqueue({ delta: msg.text });
+        } else if (msg.type === "done") {
+          safeEnqueue({ done: true, title: msg.title });
+          cleanup();
+          safeClose();
+        } else if (msg.type === "error") {
+          safeEnqueue({ error: msg.message });
+          cleanup();
+          safeClose();
+        }
+      };
+      const cleanup = () => {
+        ch.emitter.off("msg", onMsg);
+      };
+      ch.emitter.on("msg", onMsg);
+
+      // Client refresh / navigate-away → drop subscription, but DO NOT
+      // abort the underlying runner (other viewers may still be watching,
+      // and the upload-triggered spawn must keep going regardless).
+      req.signal.addEventListener("abort", () => {
+        cleanup();
+        safeClose();
+      });
     },
   });
 
