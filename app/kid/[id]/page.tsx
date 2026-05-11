@@ -96,6 +96,13 @@ export default async function KidHome({
   });
   const streak = getStreak(id);
   const reviewDue = dueCount(id);
+  const todayIso = new Date().toLocaleDateString("sv-SE");
+  const earnedRow = db
+    .prepare(
+      "SELECT COALESCE(SUM(minutes_awarded),0) as m FROM daily_logs WHERE profile_id = ? AND date = ?",
+    )
+    .get(id, todayIso) as { m: number };
+  const earnedToday = earnedRow.m | 0;
 
   return (
     <main className="flex flex-1 flex-col items-center px-6 py-10">
@@ -132,6 +139,16 @@ export default async function KidHome({
           />
 
           <div className="flex flex-col gap-4">
+            <Link
+              href={`/kid/${id}/today`}
+              className="flex items-center justify-center gap-3 rounded-3xl bg-gradient-to-r from-emerald-400 to-teal-400 px-6 py-6 text-2xl font-bold text-white shadow-xl transition hover:scale-[1.02]"
+            >
+              📋 今日任務
+              <span className="rounded-full bg-white/20 px-3 py-1 text-base">
+                🎮 {earnedToday} 分
+              </span>
+            </Link>
+
             <Link
               href={`/kid/${id}/capture`}
               className="flex items-center justify-center gap-3 rounded-3xl bg-gradient-to-r from-amber-400 to-rose-400 px-6 py-8 text-2xl font-bold text-white shadow-xl transition hover:scale-[1.02]"

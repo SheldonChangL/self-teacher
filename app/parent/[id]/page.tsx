@@ -67,6 +67,15 @@ export default async function KidDetail({
           <ProfileSettingsModal profile={profile} />
         </header>
 
+        <div className="mt-4">
+          <Link
+            href={`/parent/${id}/weekly`}
+            className="inline-flex items-center gap-2 rounded-2xl bg-emerald-100 px-5 py-3 text-base font-semibold text-emerald-800 hover:bg-emerald-200"
+          >
+            📊 本週總結 →
+          </Link>
+        </div>
+
         {/* Hero numbers */}
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Stat icon="📚" label="學過的課" value={stats.lessons_total} />
