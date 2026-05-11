@@ -112,6 +112,26 @@ const PHONEME_HINTS: Record<string, string> = {
   sn: "snuh",
   sw: "swuh",
 
+  // -- Trigraph blends --
+  scr: "skruh",
+  spl: "spluh",
+  spr: "spruh",
+  str: "struh",
+  thr: "thruh",
+  shr: "shruh",
+
+  // -- Phase 5 variants — bare graphemes are unspeakable on their own; the
+  //    UI relies on the appended example word for the audible cue. --
+  "y (as long i)": "eye",
+  "y (as long e)": "ee",
+  "soft c": "sss", // softens to /s/
+  "soft g": "juh", // softens to /dʒ/
+  "-le": "ull", // unstressed schwa+l, like "table"
+  "silent k (kn)": "nnn", // k silent in kn-
+  "silent w (wr)": "rrr", // w silent in wr-
+  "silent b (mb)": "mmm", // b silent in -mb
+  "silent gh": "", // gh silent in night/light — let example word carry it
+
   // -- Sight words: speak as-is (no hint needed) --
   // "the", "of", "to", "you", "are", "was", "said", "have", "they", "one",
   // "two", "what" — fall through to the raw grapheme below.
@@ -125,12 +145,17 @@ function normalize(g: string): string {
  *  If `exampleWord` is given, it's appended so the phoneme is reinforced
  *  in word context (e.g. "shhh. ship"). */
 export function phonemeCue(grapheme: string, exampleWord?: string): string {
-  const hint = PHONEME_HINTS[normalize(grapheme)];
-  if (hint) {
+  const key = normalize(grapheme);
+  const hasEntry = key in PHONEME_HINTS;
+  const hint = PHONEME_HINTS[key];
+  if (hasEntry) {
+    // Empty hint = "the grapheme itself is silent / not pronounceable in
+    // isolation" (e.g. silent gh). Skip the hint, just play the example.
+    if (!hint) return exampleWord ?? grapheme;
     return exampleWord ? `${hint}. ${exampleWord}` : hint;
   }
-  // Fallback: just speak the word itself. Sight words ("the", "you") and
-  // anything unknown will read naturally as whole words rather than letters.
+  // Fallback: anything not in the map (sight words like "the", or names).
+  // TTS reads whole words natively, so just speak it.
   return exampleWord ? `${grapheme}. ${exampleWord}` : grapheme;
 }
 
@@ -138,5 +163,9 @@ export function phonemeCue(grapheme: string, exampleWord?: string): string {
  *  TTS script where we want phoneme + Chinese explanation, without re-saying
  *  example words that get spoken later. */
 export function phonemeCueOnly(grapheme: string): string {
-  return PHONEME_HINTS[normalize(grapheme)] ?? grapheme;
+  const key = normalize(grapheme);
+  if (key in PHONEME_HINTS) {
+    return PHONEME_HINTS[key] || grapheme;
+  }
+  return grapheme;
 }
