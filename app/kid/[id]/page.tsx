@@ -10,6 +10,7 @@ import { BackLink } from "@/components/BackLink";
 import { StreakChip } from "@/components/StreakChip";
 import { getStreak } from "@/lib/streak";
 import { dueCount } from "@/lib/vocab";
+import { startLessonGeneration } from "@/lib/lesson-runner";
 
 const SUBJECT_BY_ID = Object.fromEntries(SUBJECTS.map((s) => [s.id, s]));
 
@@ -78,6 +79,15 @@ export default async function KidHome({
     )
     .all(id) as Session[];
 
+  // Recovery: any session without a finished lesson_json gets nudged. This is
+  // the safety net for cases where /api/upload's fire-and-forget didn't stick
+  // (process restart) or the TV's EventSource never navigated us to the
+  // lesson page (old WebOS Chromium can't run the client bundle).
+  const hasPending = sessions.some((s) => !s.lesson_json);
+  for (const s of sessions) {
+    if (!s.lesson_json) startLessonGeneration(s.id);
+  }
+
   const captureUrl = await buildCaptureUrl(id);
   const qrDataUrl = await QRCode.toDataURL(captureUrl, {
     margin: 1,
@@ -89,6 +99,12 @@ export default async function KidHome({
 
   return (
     <main className="flex flex-1 flex-col items-center px-6 py-10">
+      {/* Old TV browsers (LG WebOS) can't run the client-side EventSource
+          that auto-navigates to a lesson. Meta refresh is the no-JS fallback
+          that lets pending sessions surface as soon as they finish. */}
+      {hasPending && (
+        <meta httpEquiv="refresh" content="6" />
+      )}
       <div className="w-full max-w-4xl">
         <BackLink href="/">換人</BackLink>
 

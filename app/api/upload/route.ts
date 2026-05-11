@@ -5,6 +5,7 @@ import { db, Profile, Subject, SUBJECTS } from "@/lib/db";
 import { newId } from "@/lib/id";
 import { publishProfileEvent } from "@/lib/events";
 import { canStart } from "@/lib/limits";
+import { startLessonGeneration } from "@/lib/lesson-runner";
 
 const VALID_SUBJECTS = new Set(SUBJECTS.map((s) => s.id));
 
@@ -78,6 +79,11 @@ export async function POST(req: Request) {
     type: "session-created",
     sessionId,
   });
+
+  // Kick off claude immediately. The TV's client-side EventSource may not
+  // navigate (old WebOS browsers can't run the client bundle), but the
+  // lesson should still generate; the TV will pick it up on next refresh.
+  startLessonGeneration(sessionId);
 
   return NextResponse.json({
     session_id: sessionId,
