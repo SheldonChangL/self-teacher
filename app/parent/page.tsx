@@ -62,6 +62,15 @@ export default function ParentDashboard() {
           </p>
         </header>
 
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Link
+            href="/parent/tasks"
+            className="rounded-2xl bg-emerald-100 px-5 py-3 text-base font-semibold text-emerald-800 hover:bg-emerald-200"
+          >
+            ⚙️ 管理任務預設
+          </Link>
+        </div>
+
         {/* Hero stats */}
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard label="小朋友" value={stats.totals.kids} icon="👧" />
@@ -161,6 +170,12 @@ export default function ParentDashboard() {
                       className="text-sm text-amber-700 hover:underline"
                     >
                       看詳情 →
+                    </Link>
+                    <Link
+                      href={`/parent/${k.id}/weekly`}
+                      className="text-sm text-emerald-700 hover:underline"
+                    >
+                      週總結 →
                     </Link>
                   </div>
                   <div className="mt-4 grid grid-cols-3 gap-2 text-center">

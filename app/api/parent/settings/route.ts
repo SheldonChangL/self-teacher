@@ -2,11 +2,22 @@ import { NextResponse } from "next/server";
 import { getSetting, setSetting } from "@/lib/db";
 import { DEFAULTS } from "@/lib/limits";
 import { PROVIDERS, type ProviderId } from "@/lib/ai-router";
+import { BONUS_DEFAULTS, BONUS_KEYS } from "@/lib/rewards";
 
 export const runtime = "nodejs";
 
 const NUM_KEYS = ["daily_lessons_limit", "monthly_budget_usd"] as const;
 const STR_KEYS = ["ai_provider", "ai_model_claude", "ai_model_gemini"] as const;
+const BONUS_NUM_KEYS = [
+  BONUS_KEYS.pct,
+  BONUS_KEYS.min,
+  BONUS_KEYS.max,
+] as const;
+const BONUS_DEFAULTS_BY_KEY: Record<string, number> = {
+  [BONUS_KEYS.pct]: BONUS_DEFAULTS.pct,
+  [BONUS_KEYS.min]: BONUS_DEFAULTS.min,
+  [BONUS_KEYS.max]: BONUS_DEFAULTS.max,
+};
 
 export async function GET() {
   const out: Record<string, number | string> = {};
@@ -16,6 +27,10 @@ export async function GET() {
   }
   for (const k of STR_KEYS) {
     out[k] = getSetting(k) ?? "";
+  }
+  for (const k of BONUS_NUM_KEYS) {
+    const v = getSetting(k);
+    out[k] = v ? Number(v) : BONUS_DEFAULTS_BY_KEY[k];
   }
   if (!out.ai_provider) out.ai_provider = "claude";
   if (!out.ai_model_claude)
@@ -34,6 +49,15 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: `bad ${k}` }, { status: 400 });
       }
       setSetting(k, String(n));
+    }
+  }
+  for (const k of BONUS_NUM_KEYS) {
+    if (body[k] !== undefined) {
+      const n = Number(body[k]);
+      if (!Number.isFinite(n) || n < 0) {
+        return NextResponse.json({ error: `bad ${k}` }, { status: 400 });
+      }
+      setSetting(k, String(Math.round(n)));
     }
   }
 
