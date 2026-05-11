@@ -14,11 +14,15 @@ export function PhonicsTTSButton({
   rate = 0.85,
   label,
   variant = "icon",
+  ariaLabel,
 }: {
   text: string;
   rate?: number;
   label?: string;
   variant?: Variant;
+  /** Override accessible name — useful when `text` is a TTS cue like "shhh"
+   *  but you want the button announced as "念 sh 的音". */
+  ariaLabel?: string;
 }) {
   const [supported, setSupported] = useState(false);
 
@@ -57,7 +61,7 @@ export function PhonicsTTSButton({
   return (
     <button
       type="button"
-      aria-label={`念出 ${text}`}
+      aria-label={ariaLabel ?? `念出 ${text}`}
       onClick={speak}
       className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-500 text-xl text-white shadow transition hover:bg-sky-600 active:scale-95"
     >

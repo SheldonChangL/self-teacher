@@ -7,6 +7,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { PhonicsLessonContent } from "@/lib/phonics";
+import { phonemeCue, phonemeCueOnly } from "@/lib/phonics-pronunciation";
 import { PhonicsTTSButton } from "./PhonicsTTSButton";
 import { TTSButton } from "./TTSButton";
 
@@ -38,11 +39,13 @@ export function PhonicsLessonView({
 
   // Single big TTS pass: intro + how-to-say (per grapheme) + words + story
   // concatenated so the kid can tap once and hear the whole lesson read out.
+  // We feed the engine `phonemeCueOnly(g.grapheme)` instead of the raw
+  // grapheme so it pronounces /ʃ/ for "sh" instead of spelling "S-H".
   const fullScript = useMemo(() => {
     const parts: string[] = [];
     parts.push(content.intro_zh);
     for (const g of content.graphemes) {
-      parts.push(`${g.grapheme}. ${g.how_to_say_zh}`);
+      parts.push(`${phonemeCueOnly(g.grapheme)}. ${g.how_to_say_zh}`);
       for (const w of g.example_words) {
         parts.push(w.word + "。 " + w.meaning_zh);
       }
@@ -124,7 +127,11 @@ export function PhonicsLessonView({
                 </span>
               </h2>
             </div>
-            <PhonicsTTSButton text={g.grapheme} rate={0.7} />
+            <PhonicsTTSButton
+              text={phonemeCue(g.grapheme, g.example_words[0]?.word)}
+              rate={0.7}
+              ariaLabel={`念 ${g.grapheme} 的音`}
+            />
           </header>
 
           <p className="mt-3 text-lg text-zinc-700">
