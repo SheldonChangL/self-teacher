@@ -33,9 +33,9 @@ export const PHONICS_STAGES: ReadonlyArray<PhonicsStageDef> = [
   {
     slug: "stage-1",
     order: 1,
-    title: "字母音 Letter Sounds",
+    title: "字母音 Letter Sounds A–Z",
     emoji: "🔤",
-    description: "26 個字母最常見的單一發音，從 satpin 開始拼第一個字。",
+    description: "完整 26 個字母 a–z 的發音（依英國 satpin 順序教學，可立刻拼出 cat / pin / tap）。",
     colorFrom: "from-emerald-400",
     colorTo: "to-teal-400",
     lessons: [

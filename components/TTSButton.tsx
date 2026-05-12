@@ -51,8 +51,13 @@ export function TTSButton({ text }: { text: string }) {
       .trim();
     const chunks = chunkByLang(stripped);
     const gbVoice = pickGBVoice();
-    const queue = chunks.map((c) => {
-      const u = new SpeechSynthesisUtterance(c.text);
+    const queue = chunks.map((c, i) => {
+      // Pad the final chunk so Chrome/Safari don't clip the tail consonant.
+      const text =
+        i === chunks.length - 1 && !/[。.!?！？]$/.test(c.text)
+          ? c.text + ". "
+          : c.text;
+      const u = new SpeechSynthesisUtterance(text);
       u.lang = c.lang;
       u.rate = 0.95;
       u.pitch = 1.05;
