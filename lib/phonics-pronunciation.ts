@@ -141,27 +141,9 @@ function normalize(g: string): string {
   return g.trim().toLowerCase();
 }
 
-/** Convert a grapheme like "sh" into a TTS-friendly cue like "shhh".
- *  If `exampleWord` is given, it's appended so the phoneme is reinforced
- *  in word context (e.g. "shhh. ship"). */
-export function phonemeCue(grapheme: string, exampleWord?: string): string {
-  const key = normalize(grapheme);
-  const hasEntry = key in PHONEME_HINTS;
-  const hint = PHONEME_HINTS[key];
-  if (hasEntry) {
-    // Empty hint = "the grapheme itself is silent / not pronounceable in
-    // isolation" (e.g. silent gh). Skip the hint, just play the example.
-    if (!hint) return exampleWord ?? grapheme;
-    return exampleWord ? `${hint}. ${exampleWord}` : hint;
-  }
-  // Fallback: anything not in the map (sight words like "the", or names).
-  // TTS reads whole words natively, so just speak it.
-  return exampleWord ? `${grapheme}. ${exampleWord}` : grapheme;
-}
-
-/** Lightweight grapheme-only cue (no word appended) — used in the full-lesson
- *  TTS script where we want phoneme + Chinese explanation, without re-saying
- *  example words that get spoken later. */
+/** Convert a grapheme like "sh" into a TTS-friendly cue like "shhh" that
+ *  produces (an approximation of) the phoneme. Falls back to the raw
+ *  grapheme for sight words and anything not in the hint map. */
 export function phonemeCueOnly(grapheme: string): string {
   const key = normalize(grapheme);
   if (key in PHONEME_HINTS) {
