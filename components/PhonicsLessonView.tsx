@@ -7,7 +7,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { PhonicsLessonContent } from "@/lib/phonics";
-import { phonemeCue, phonemeCueOnly } from "@/lib/phonics-pronunciation";
+import { phonemeCueOnly } from "@/lib/phonics-pronunciation";
 import { PhonicsTTSButton } from "./PhonicsTTSButton";
 import { TTSButton } from "./TTSButton";
 
@@ -128,7 +128,7 @@ export function PhonicsLessonView({
               </h2>
             </div>
             <PhonicsTTSButton
-              text={phonemeCue(g.grapheme, g.example_words[0]?.word)}
+              text={phonemeCueOnly(g.grapheme)}
               rate={0.7}
               ariaLabel={`念 ${g.grapheme} 的音`}
             />
