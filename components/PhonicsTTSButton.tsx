@@ -37,7 +37,12 @@ export function PhonicsTTSButton({
 
   function speak() {
     window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
+    // Chrome / Safari clip the tail ~100ms of short utterances ("ship",
+    // "fish"). Padding the end with a period + space coaxes the engine into
+    // adding a natural sentence-end pause, so the final consonant is fully
+    // pronounced. Trailing dot is silent in TTS but the engine waits for it.
+    const padded = text.trim().endsWith(".") ? text : text + ". ";
+    const u = new SpeechSynthesisUtterance(padded);
     u.lang = "en-GB";
     u.rate = rate;
     u.pitch = 1.05;

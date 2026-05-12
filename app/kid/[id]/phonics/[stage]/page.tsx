@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db, Profile } from "@/lib/db";
+import { AlphabetOverview } from "@/components/AlphabetOverview";
 import { BackLink } from "@/components/BackLink";
 import { findStage } from "@/lib/phonics-curriculum";
 import { getCompletedLessonKeys, getSeededLessonKeys } from "@/lib/phonics";
@@ -45,6 +46,8 @@ export default async function PhonicsStagePage({
           </div>
           <p className="mt-3 text-base leading-relaxed">{stage.description}</p>
         </header>
+
+        {stage.slug === "stage-1" && <AlphabetOverview />}
 
         <ul className="space-y-3">
           {stage.lessons.map((lesson, i) => {
