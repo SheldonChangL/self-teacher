@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from "react";
 import { pickGBVoice } from "./tts-voices";
+import { silence, speakOne } from "./tts-controller";
 
 type Variant = "icon" | "pill";
 
@@ -31,16 +32,16 @@ export function PhonicsTTSButton({
       typeof window !== "undefined" && "speechSynthesis" in window;
     setSupported(ok);
     if (ok) window.speechSynthesis.getVoices();
+    return () => silence();
   }, []);
 
   if (!supported) return null;
 
   function speak() {
-    window.speechSynthesis.cancel();
     // Chrome / Safari clip the tail ~100ms of short utterances ("ship",
     // "fish"). Padding the end with a period + space coaxes the engine into
     // adding a natural sentence-end pause, so the final consonant is fully
-    // pronounced. Trailing dot is silent in TTS but the engine waits for it.
+    // pronounced.
     const padded = text.trim().endsWith(".") ? text : text + ". ";
     const u = new SpeechSynthesisUtterance(padded);
     u.lang = "en-GB";
@@ -48,7 +49,7 @@ export function PhonicsTTSButton({
     u.pitch = 1.05;
     const voice = pickGBVoice();
     if (voice) u.voice = voice;
-    window.speechSynthesis.speak(u);
+    speakOne(u);
   }
 
   if (variant === "pill") {
@@ -56,6 +57,7 @@ export function PhonicsTTSButton({
       <button
         type="button"
         onClick={speak}
+        aria-label={ariaLabel ?? label}
         className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-3 py-1 text-sm font-semibold text-sky-700 transition hover:bg-sky-200 active:scale-95"
       >
         🔊 {label ?? "聽一次"}

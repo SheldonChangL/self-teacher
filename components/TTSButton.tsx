@@ -2,6 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { pickGBVoice } from "./tts-voices";
+import {
+  silence,
+  speakQueue,
+  type QueueHandle,
+} from "./tts-controller";
 
 const CJK = /[㐀-鿿豈-﫿　-〿＀-￯]/;
 
@@ -26,7 +31,7 @@ function chunkByLang(text: string): { text: string; lang: string }[] {
 export function TTSButton({ text }: { text: string }) {
   const [supported, setSupported] = useState(false);
   const [playing, setPlaying] = useState(false);
-  const queueRef = useRef<SpeechSynthesisUtterance[]>([]);
+  const handleRef = useRef<QueueHandle | null>(null);
 
   useEffect(() => {
     setSupported(typeof window !== "undefined" && "speechSynthesis" in window);
@@ -36,15 +41,14 @@ export function TTSButton({ text }: { text: string }) {
       window.speechSynthesis.getVoices();
     }
     return () => {
-      if (typeof window !== "undefined" && "speechSynthesis" in window)
-        window.speechSynthesis.cancel();
+      handleRef.current?.stop();
+      silence();
     };
   }, []);
 
   if (!supported) return null;
 
   function start() {
-    window.speechSynthesis.cancel();
     const stripped = text
       .replace(/[#*`_>]/g, "")
       .replace(/\s+/g, " ")
@@ -53,35 +57,24 @@ export function TTSButton({ text }: { text: string }) {
     const gbVoice = pickGBVoice();
     const queue = chunks.map((c, i) => {
       // Pad the final chunk so Chrome/Safari don't clip the tail consonant.
-      const text =
+      const sentence =
         i === chunks.length - 1 && !/[。.!?！？]$/.test(c.text)
           ? c.text + ". "
           : c.text;
-      const u = new SpeechSynthesisUtterance(text);
+      const u = new SpeechSynthesisUtterance(sentence);
       u.lang = c.lang;
       u.rate = 0.95;
       u.pitch = 1.05;
       if (c.lang === "en-GB" && gbVoice) u.voice = gbVoice;
       return u;
     });
-    queueRef.current = queue;
     setPlaying(true);
-    let i = 0;
-    const next = () => {
-      if (i >= queue.length) {
-        setPlaying(false);
-        return;
-      }
-      const u = queue[i++];
-      u.onend = next;
-      u.onerror = next;
-      window.speechSynthesis.speak(u);
-    };
-    next();
+    handleRef.current = speakQueue(queue, () => setPlaying(false));
   }
 
   function stop() {
-    window.speechSynthesis.cancel();
+    handleRef.current?.stop();
+    handleRef.current = null;
     setPlaying(false);
   }
 
